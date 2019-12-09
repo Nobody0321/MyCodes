@@ -1,10 +1,8 @@
 import torch.nn as nn
 
 
-class Soft_attention(nn.Module):
-    def __init__(self, in_channels, relation_vec):
-        super(Soft_attention, self).__init__()
+class SoftAttention(nn.Module):
+    def __init__(self, in_channels, compare_vec):
+        super(SoftAttention, self).__init__()
         self.in_channels = in_channels
-        self.relation_vec = relation_vec
-
-    
+        self.relation_vec = compare_vec

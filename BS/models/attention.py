@@ -15,7 +15,7 @@ class ScaledDotProductAttention(nn.Module):
         super().__init__()
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, q, k, v, mask=None):
+    def forward(self, q, k, v):
         """
         for translation, mask is necessary, but for relation extraction, it's not.
         q, k, v: (n, l, d_feature)
@@ -26,8 +26,6 @@ class ScaledDotProductAttention(nn.Module):
         attn = torch.bmm(q, k.transpose(1, 2))  # (n, l, l)
         attn = attn / math.sqrt(d_k)
         attn = torch.exp(attn)
-        if mask is not None:
-            attn = attn.masked_fill(mask, 0)
         attn = attn / attn.sum(-1, keepdim=True)
         attn = self.dropout(attn)
         output = torch.bmm(attn, v)  # (n, l, d_feature)
@@ -43,7 +41,7 @@ class AttentionHead(nn.Module):
         self.key_transform = nn.Linear(d_model, d_feature)
         self.value_transform = nn.Linear(d_model, d_feature)
 
-    def forward(self, queries, keys, values, mask=None):
+    def forward(self, queries, keys, values):
         # (n, l, d_model) -> (n, l, d_feature)
         Q = self.query_transform(queries)
         K = self.key_transform(keys)
@@ -75,11 +73,11 @@ class MultiHeadAttention(nn.Module):
         ])
         self.projection = nn.Linear(d_feature * n_heads, d_model)
 
-    def forward(self, queries, keys, values, mask=None):
+    def forward(self, queries, keys, values):
         """
         queries, keys, values: (n, l, d_model)
         """
-        x = [attn(queries, keys, values, mask=mask)  # n_heads * (n, l, d_feature)
+        x = [attn(queries, keys, values)  # n_heads * (n, l, d_feature)
              for i, attn in enumerate(self.attn_heads)]
 
         # concatenate again
@@ -102,11 +100,11 @@ class EncoderBlock(nn.Module):
         )
         self.layer_norm2 = nn.LayerNorm(d_model)
 
-    def forward(self, x, mask=None):
+    def forward(self, x):
         """
         x : (n, l, d_model)
         """
-        att = self.attn_head(x, x, x, mask=mask)  # self attention (n, l, d_model) -> (n, l, d_model)
+        att = self.attn_head(x, x, x)  # self attention (n, l, d_model) -> (n, l, d_model)
         # Apply normalization and residual connection
         x = x + self.dropout(self.layer_norm1(att))  # (n, l, d_model) -> (n, l, d_model)
         # Apply position-wise feedforward networks
@@ -134,18 +132,3 @@ class TransformerEncoder(nn.Module):
         for encoder in self.encoders:
             x = encoder(x)
         return x  # (n, l, d_model)
-
-
-if __name__ == '__main__':
-    from config.Config import Config
-
-    x = torch.randn(2, 3, 512)
-    print(x)
-    config = Config()
-    t1 = TransformerEncoder(config)
-    t2 = TransformerEncoder(config)
-    senten_vec = t1(x)
-    senten_vec2 = senten_vec.sum(dim=1).unsqueeze(0)
-    print(senten_vec2)
-    bag_vec = t2(senten_vec2)
-    print(bag_vec)

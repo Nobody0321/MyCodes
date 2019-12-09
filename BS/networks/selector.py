@@ -123,13 +123,10 @@ from .encoder import TransformerEncoder
 
 
 class Bag_Attention(nn.Module):
-    def  __init__(self, config):
+    def __init__(self, config):
         super(Bag_Attention, self).__init__()
-<<<<<<< HEAD
         self.encoder = TransformerEncoder(config=config)
-=======
-        self.encoder = Transforme rEncoder(config=config)
->>>>>>> 8e0d2f8... 1029
+        self.scope = None
 
     def forward(self, x):
         """
@@ -138,8 +135,14 @@ class Bag_Attention(nn.Module):
         :return:
         """
         all_bag_vec = []
+        t = x[self.scope[self.scope[0]]: self.scope[self.scope[1]]]
+        print(t)
+        import numpy as np
+        import os
+        np.save(os.path.join("./", 't.npy'), t.detach().numpy())
         for i in range(len(self.scope) - 1):
-            one_bag_vec = self.encoder(x[self.scope[i]: self.scope[i + 1]])
+            temp_x = x[self.scope[i]: self.scope[i + 1]]
+            one_bag_vec = self.encoder(temp_x)
             all_bag_vec.append(one_bag_vec)
         all_bag_vec = torch.stack(all_bag_vec)
         logits = self.get_logits(all_bag_vec)

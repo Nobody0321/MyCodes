@@ -1,3 +1,4 @@
+*__pycache__
 *.iml
 *.xml
 *test.py
@@ -19,3 +20,5 @@ test.*
 KG/tf_test.py
 BS/mini_dataset-1000/
 BS/raw_data/
+MyBS/mini_dataset-1000/
+MyBS/raw_data/

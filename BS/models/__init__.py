@@ -1,3 +1,4 @@
 # from .Model import Model
-from .BLSTM_ATT import BLSTM_ATT as BLSTM_ATT
+from .BLstmAtt import BLstmAtt
 from .PCNN_ATT import PCNN_ATT
+from .attention import TransformerEncoder

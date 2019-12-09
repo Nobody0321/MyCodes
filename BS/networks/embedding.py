@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 
+# embed words to low dim vector by looking up a pre trained w2v matrix
 class Embedding(nn.Module):
 	def __init__(self, config):
 		super(Embedding, self).__init__()
@@ -16,6 +17,7 @@ class Embedding(nn.Module):
 		self.pos2 = None
 
 	def init_word_weights(self):
+		# load pre trained w2v matrix
 		self.word_embedding.weight.data.copy_(torch.from_numpy(self.config.data_word_vec))
 	
 	def init_pos_weights(self):

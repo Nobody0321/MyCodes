@@ -25,7 +25,6 @@ class ScaledDotProductAttention(nn.Module):
 
         attn = torch.bmm(q, k.transpose(1, 2))  # (n, l, l), a look up matrix
         attn = attn / math.sqrt(d_k)
-        # print("attn", attn)
         attn = torch.exp(attn)
         attn = attn / attn.sum(-1, keepdim=True)
         attn = self.dropout(attn)
@@ -62,7 +61,6 @@ class MultiHeadAttention(nn.Module):
         """
         super().__init__()
         # in practice, d_model == d_feature * n_heads
-        # print(d_model, d_feature, n_heads)
         assert d_model == d_feature * n_heads
 
         self.d_model = d_model

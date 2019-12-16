@@ -10,6 +10,11 @@ class Classifier(nn.Module):
         self.loss = nn.CrossEntropyLoss()
 
     def forward(self, logits):
+        """
+
+        :param logits: selector output, (bag_num, 53/relation_num)
+        :return: loss and predicted relation
+        """
         loss = self.loss(logits, self.label)
-        _, output = torch.max(logits, dim=1)
-        return loss, output.item()
+        prediction = torch.max(logits, dim=1)[1]  # max indices, aka max relation
+        return loss, prediction

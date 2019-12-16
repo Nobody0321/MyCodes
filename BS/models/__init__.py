@@ -1,4 +1,2 @@
-# from .Model import Model
-from .BLstmAtt import BLstmAtt
+from .BiGruAtt import BiGruAtt
 from .PCNN_ATT import PCNN_ATT
-from .attention import TransformerEncoder

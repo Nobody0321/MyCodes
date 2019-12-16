@@ -1,7 +1,6 @@
 import os
 import datetime
-import sys
-
+import logging
 import numpy as np
 import torch
 import torch.optim as optim
@@ -35,61 +34,69 @@ class Config(object):
         self.acc_NA = Accuracy()
         self.acc_not_NA = Accuracy()
         self.acc_total = Accuracy()
-        self.data_path = './mini_dataset-1000'
+        self.data_dir = "./data"
+        self.log_dir = "./logs"
         self.use_bag = True
-        self.use_gpu = False
+        self.use_gpu = True
         self.is_training = True
-        self.max_length = 120
-        self.pos_num = 2 * self.max_length
-        self.num_classes = 53
-        self.hidden_size = 230
-        self.pos_size = 5
+        self.max_sen_length = 120  # max sentnece lem
+        self.pos_num = 2 * self.max_sen_length  # num of positions = 240
+        self.num_classes = 53  # num of relations
+        self.hidden_dim = 230  # output dim for pool layer in pcnn
+        self.word_embedding_dim = 50  # word embedding dim
+        self.pos_embedding_dim = 5
         self.max_epoch = 15
-        self.opt_method = 'SGD'
+        self.opt_method = "SGD"
         self.optimizer = None
         self.learning_rate = 0.5
-        self.weight_decay = 1e-5
+        self.weight_decay = 1e-5  # for Adadelta
         self.dropout = 0.1
-        self.checkpoint_dir = './checkpoint'
-        self.test_result_dir = './test_result'
+        self.checkpoint_dir = "./checkpoint"
+        self.test_result_dir = "./test_result"
         self.save_epoch = 1
         self.test_epoch = 1
         self.pretrain_model = None
         self.trainModel = None
         self.testModel = None
-        self.batch_size = 15
+        self.batch_size = 50
         self.sentence_len = 120
-        self.word_size = 50
         self.window_size = 3
         self.epoch_range = None
-        self.in_channels = self.word_size + self.pos_size * 2
-        self.d_feature = 512
-        self.d_ff = 2048
-        self.d_model = 512
-        self.n_heads = 8
-        self.n_blocks = 6
+        self.input_dim = self.word_embedding_dim + self.pos_embedding_dim * 2  # input dim
+
+    def init_logger(self, log_name):
+        if not os.path.exists(self.log_dir):
+            os.mkdir(self.log_dir)
+        logger = logging.getLogger(__name__)
+        logger.setLevel(level=logging.DEBUG)
+        log_file_name = log_name + ".log"
+        log_handler = logging.FileHandler(os.path.join(self.log_dir, log_file_name), "w")
+        log_format = logging.Formatter("%(asctime)s: %(message)s")
+        log_handler.setFormatter(log_format)
+        logger.addHandler(log_handler)
+        self.logger = logger
 
     def set_data_path(self, data_path):
-        self.data_path = data_path
+        self.data_dir = data_path
 
     def set_max_length(self, max_length):
-        self.max_length = max_length
-        self.pos_num = 2 * self.max_length
+        self.max_sen_length = max_length
+        self.pos_num = 2 * self.max_sen_length
 
     def set_num_classes(self, num_classes):
         self.num_classes = num_classes
 
     def set_hidden_size(self, hidden_size):
-        self.hidden_size = hidden_size
+        self.hidden_dim = hidden_size
 
     def set_window_size(self, window_size):
         self.window_size = window_size
 
     def set_pos_size(self, pos_size):
-        self.pos_size = pos_size
+        self.pos_embedding_dim = pos_size
 
     def set_word_size(self, word_size):
-        self.word_size = word_size
+        self.word_embedding_dim = word_size
 
     def set_max_epoch(self, max_epoch):
         self.max_epoch = max_epoch
@@ -107,7 +114,7 @@ class Config(object):
         self.weight_decay = weight_decay
 
     def set_drop_prob(self, drop_prob):
-        self.drop_prob = drop_prob
+        self.dropout = drop_prob
 
     def set_checkpoint_dir(self, checkpoint_dir):
         self.checkpoint_dir = checkpoint_dir
@@ -141,23 +148,22 @@ class Config(object):
 
     def load_train_data(self):
         """
-        将数据载入当前类保存
-        :return:
+        load pre processed training and allocate to this class
         """
         print("Reading training data...")
-        self.data_word_vec = np.load(os.path.join(self.data_path, 'vec.npy'))  # word vec mapping
-        self.data_train_word = np.load(os.path.join(self.data_path, 'train_word.npy'))  # one hot for each word
-        self.data_train_pos1 = np.load(os.path.join(self.data_path, 'train_pos1.npy'))
-        self.data_train_pos2 = np.load(os.path.join(self.data_path, 'train_pos2.npy'))
-        # self.data_train_mask = np.load(os.path.join(self.data_path, 'train_mask.npy'))
+        self.data_word_vec = np.load(os.path.join(self.data_dir, "vec.npy"))  # word vec mapping
+        self.data_train_word = np.load(os.path.join(self.data_dir, "train_word.npy"))  # one hot for each word
+        self.data_train_pos1 = np.load(os.path.join(self.data_dir, "train_pos1.npy"))
+        self.data_train_pos2 = np.load(os.path.join(self.data_dir, "train_pos2.npy"))
+        # self.data_train_mask = np.load(os.path.join(self.data_path, "train_mask.npy"))
         if self.use_bag:
-            self.data_query_label = np.load(os.path.join(self.data_path, 'train_ins_label.npy'))  # 每一句话的real label
-            self.data_train_label = np.load(os.path.join(self.data_path, 'train_bag_label.npy'))  # label for each bag
+            self.data_query_label = np.load(os.path.join(self.data_dir, "train_ins_label.npy"))  # 每一句话的 real label
+            self.data_train_label = np.load(os.path.join(self.data_dir, "train_bag_label.npy"))  # label for each bag
             self.data_train_scope = np.load(
-                os.path.join(self.data_path, 'train_bag_scope.npy'))  # bag range in training data
+                os.path.join(self.data_dir, "train_bag_scope.npy"))  # bag range in training data
         else:
-            self.data_train_label = np.load(os.path.join(self.data_path, 'train_ins_label.npy'))
-            self.data_train_scope = np.load(os.path.join(self.data_path, 'train_ins_scope.npy'))
+            self.data_train_label = np.load(os.path.join(self.data_dir, "train_ins_label.npy"))
+            self.data_train_scope = np.load(os.path.join(self.data_dir, "train_ins_scope.npy"))
         print("Finish reading")
         self.data_train_order = list(range(len(self.data_train_label)))  # bag label number, according to iteration size
         self.train_batches_num = len(self.data_train_label) // self.batch_size
@@ -166,19 +172,19 @@ class Config(object):
 
     def load_test_data(self):
         print("Reading testing data...")
-        self.data_word_vec = np.load(os.path.join(self.data_path, 'vec.npy'))  # word id - vec mapping
-        self.data_test_word = np.load(os.path.join(self.data_path, 'test_word.npy'))  # word idx
-        self.data_test_pos1 = np.load(os.path.join(self.data_path, 'test_pos1.npy'))  #
-        self.data_test_pos2 = np.load(os.path.join(self.data_path, 'test_pos2.npy'))
-        # self.data_test_mask = np.load(os.path.join(self.data_path, 'test_mask.npy'))
+        self.data_word_vec = np.load(os.path.join(self.data_dir, "vec.npy"))  # word id - vec mapping
+        self.data_test_word = np.load(os.path.join(self.data_dir, "test_word.npy"))  # word idx
+        self.data_test_pos1 = np.load(os.path.join(self.data_dir, "test_pos1.npy"))  #
+        self.data_test_pos2 = np.load(os.path.join(self.data_dir, "test_pos2.npy"))
+        # self.data_test_mask = np.load(os.path.join(self.data_path, "test_mask.npy"))
         if self.use_bag:
-            self.data_test_label = np.load(os.path.join(self.data_path, 'test_bag_label.npy'))
-            self.data_test_scope = np.load(os.path.join(self.data_path, 'test_bag_scope.npy'))
+            self.data_test_label = np.load(os.path.join(self.data_dir, "test_bag_label.npy"))
+            self.data_test_scope = np.load(os.path.join(self.data_dir, "test_bag_scope.npy"))
         else:
-            self.data_test_label = np.load(os.path.join(self.data_path, 'test_ins_label.npy'))
-            self.data_test_scope = np.load(os.path.join(self.data_path, 'test_ins_scope.npy'))
+            self.data_test_label = np.load(os.path.join(self.data_dir, "test_ins_label.npy"))
+            self.data_test_scope = np.load(os.path.join(self.data_dir, "test_ins_scope.npy"))
         print("Finish reading")
-        self.test_batches = len(self.data_test_label) / self.batch_size
+        self.test_batches = len(self.data_test_label) // self.batch_size
         if len(self.data_test_label) % self.batch_size != 0:
             self.test_batches += 1
 
@@ -186,8 +192,8 @@ class Config(object):
 
     def set_train_model(self, model):
         print("Initializing training model...")
-        self.model = model
-        self.trainModel = self.model(config=self)
+        self.model = model  # model class
+        self.trainModel = self.model(config=self)  # model instance
         if self.pretrain_model is not None:
             self.trainModel.load_state_dict(torch.load(self.pretrain_model))
         if self.use_gpu:
@@ -212,13 +218,14 @@ class Config(object):
         print("Initializing test model...")
         self.model = model
         self.testModel = self.model(config=self)
-        self.testModel.cuda()
+        if self.use_gpu:
+            self.testModel.cuda()
         self.testModel.eval()
         print("Finish initializing")
 
     def get_train_batch(self, batch_number):
         """
-        one bag is one iteration
+        a bag is an iteration
         :param batch_number: batch_number
         """
         # self.data_train_order ids shuffled, so the batch is shuffled
@@ -226,22 +233,24 @@ class Config(object):
                               self.data_train_order[
                               batch_number * self.batch_size: (batch_number + 1) * self.batch_size], axis=0)
         index = []
-        scope = [0]  # bag scopes
+        bag_scope = [0]  # store bag scopes
         for num in input_scope:
-            index += list(range(num[0], num[1] + 1))  # extend one bag scope
-            scope.append(scope[len(scope) - 1] + num[1] - num[0] + 1)
-        self.batch_word = self.data_train_word[index, :]
-        self.batch_pos1 = self.data_train_pos1[index, :]
-        self.batch_pos2 = self.data_train_pos2[index, :]
+            # meaning from num[0] to num[1] in training set are sentences in one bag
+            index += list(range(num[0], num[1] + 1))
+            bag_scope.append(bag_scope[len(bag_scope) - 1] + (num[1] - num[0]) + 1)
+        self.word_embedding_in_batch = self.data_train_word[index, :]
+        self.postition_embedding1_in_batch = self.data_train_pos1[index, :]
+        self.postition_embedding2_in_batch = self.data_train_pos2[index, :]
         # self.batch_mask = self.data_train_mask[index, :]
 
-        # bags' labels in one batch
+        # bags" label ids in one batch, like [12, 15] means relation 12 for bag 0 ans relation 15 for bag 1
         self.batch_label = np.take(self.data_train_label,
                                    self.data_train_order[
                                    batch_number * self.batch_size: (batch_number + 1) * self.batch_size], axis=0)
-        # self.batch_attention_query = self.data_query_label[index]
+        self.batch_attention_query = self.data_query_label[index]  # get all rel ids for sens in one batch
 
-        self.batch_scope = scope  # all bag scope in one batch
+        # all bag scope in one batch
+        self.batch_scope = bag_scope
 
     def get_test_batch(self, batch):
         """
@@ -253,40 +262,50 @@ class Config(object):
         for num in input_scope:
             index = index + list(range(num[0], num[1] + 1))
             scope.append(scope[len(scope) - 1] + num[1] - num[0] + 1)
-        self.batch_word = self.data_test_word[index, :]
-        self.batch_pos1 = self.data_test_pos1[index, :]
-        self.batch_pos2 = self.data_test_pos2[index, :]
+        self.word_embedding_in_batch = self.data_test_word[index, :]
+        self.postition_embedding1_in_batch = self.data_test_pos1[index, :]
+        self.postition_embedding2_in_batch = self.data_test_pos2[index, :]
         # self.batch_mask = self.data_test_mask[index, :]
         self.batch_scope = scope
 
     def train_one_step(self):
-        self.trainModel.embedding.word = self.to_var(self.batch_word)  # assign batch word2vec to embedding.word
-        self.trainModel.embedding.pos1 = self.to_var(self.batch_pos1)
-        self.trainModel.embedding.pos2 = self.to_var(self.batch_pos2)
-        # self.trainModel.encoder.mask = self.to_var(self.batch_mask)
         self.trainModel.selector.scope = self.batch_scope
-        # self.trainModel.selector.attention_query = self.to_var(self.batch_attention_query)
+        # assign batch word2vec to embedding.word
+        self.trainModel.embedding.word = self.to_var(self.word_embedding_in_batch)
+        self.trainModel.embedding.pos1 = self.to_var(self.postition_embedding1_in_batch)
+        self.trainModel.embedding.pos2 = self.to_var(self.postition_embedding2_in_batch)
+        # self.trainModel.encoder.mask = self.to_var(self.batch_mask)
+        self.trainModel.selector.attention_query = self.to_var(self.batch_attention_query)
         self.trainModel.selector.label = self.to_var(self.batch_label)
         self.trainModel.classifier.label = self.to_var(self.batch_label)
-        self.optimizer.zero_grad()
-        loss, _output = self.trainModel()
+        self.optimizer.zero_grad()  # clear gradient from last step
+        loss, _output = self.trainModel()  # loss and prediction result
+        _output = _output.cpu()
         loss.backward()
         self.optimizer.step()
+        loss = loss.cpu().detach().numpy()
+        print("prediction: ", _output.tolist())
+        print("gt label: ", self.batch_label)
+        self.logger.info("prediction: " + str(_output.tolist()))
+        self.logger.info("gt label: " + str(self.batch_label))
         for i, prediction in enumerate(_output):
+            # print(prediction.data)
+            # print(self.batch_label[i])
             if self.batch_label[i] == 0:
                 self.acc_NA.add(prediction == self.batch_label[i])
             else:
                 self.acc_not_NA.add(prediction == self.batch_label[i])
             self.acc_total.add(prediction == self.batch_label[i])
-        return loss.data[0]
+        return loss
 
     def test_one_step(self):
-        self.testModel.embedding.word = self.to_var(self.batch_word)
-        self.testModel.embedding.pos1 = self.to_var(self.batch_pos1)
-        self.testModel.embedding.pos2 = self.to_var(self.batch_pos2)
-        # self.testModel.encoder.mask= self.to_var(self.batch_mask)
         self.testModel.selector.scope = self.batch_scope
-        return self.testModel.test()
+        self.testModel.embedding.word = self.to_var(self.word_embedding_in_batch)
+        self.testModel.embedding.pos1 = self.to_var(self.postition_embedding1_in_batch)
+        self.testModel.embedding.pos2 = self.to_var(self.postition_embedding2_in_batch)
+        # self.testModel.encoder.mask = self.to_var(self.batch_mask)
+        # no label in test, we do not need labels to calculate loss
+        return self.testModel.test()  # only returns classification result, no need for loss
 
     def train(self):
         if not os.path.exists(self.checkpoint_dir):
@@ -295,29 +314,42 @@ class Config(object):
         best_p = None
         best_r = None
         best_epoch = 0
+        self.init_logger(self.model.__name__)
         for epoch in range(self.max_epoch):
-            print(('Epoch ' + str(epoch) + ' starts...'))
-            # 清除上轮计数
+            print("Epoch " + str(epoch) + " starts...")
+            self.logger.info("Epoch " + str(epoch) + " starts...")
             self.acc_NA.clear()
             self.acc_not_NA.clear()
             self.acc_total.clear()
-            # 打乱bag
-            np.random.shuffle(self.data_train_order)  # shuffle the bags labels' idx
+            # shuffle bag
+            np.random.shuffle(self.data_train_order)  # shuffle the bags labels" idx
             for batch_num in range(self.train_batches_num):
                 self.get_train_batch(batch_num)
                 loss = self.train_one_step()
+                if np.isnan(loss):
+                    np.save("./embedding.npy", self.word_embedding_in_batch)
+                    np.save("./scope", np.array(self.batch_scope))
+                    return
                 time_str = datetime.datetime.now().isoformat()
-                sys.stdout.write(
+                print(
                     "epoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, total accuracy: %f\r" % (
                         epoch, batch_num, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(),
-                        self.acc_total.get()))
-                sys.stdout.flush()
+                        self.acc_total.get())
+                )
+                self.logger.info("epoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, "
+                                 "total accuracy: %f\r" % (
+                                     epoch, batch_num, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(),
+                                     self.acc_total.get())
+                                 )
             if (epoch + 1) % self.save_epoch == 0:
-                print(('Epoch ' + str(epoch + 1) + ' has finished'))
-                print('Saving model...')
-                path = os.path.join(self.checkpoint_dir, self.model.__name__ + '-' + str(epoch))
+                print("Epoch " + str(epoch + 1) + " has finished")
+                print("Saving model...")
+                self.logger.info("Epoch " + str(epoch + 1) + " has finished")
+                self.logger.info("Saving model...")
+                path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch))
                 torch.save(self.trainModel.state_dict(), path)
-                print(('Have saved model to ' + path))
+                print("Have saved model to " + path)
+                self.logger.info("Have saved model to " + path)
             if (epoch + 1) % self.test_epoch == 0:
                 self.testModel = self.trainModel
                 auc, pr_x, pr_y = self.test_one_epoch()
@@ -329,18 +361,22 @@ class Config(object):
         print("Finish training")
         print(("Best epoch = %d | auc = %f" % (best_epoch, best_auc)))
         print("Storing best result...")
+        self.logger.info("Finish training")
+        self.logger.info(("Best epoch = %d | auc = %f" % (best_epoch, best_auc)))
+        self.logger.info("Storing best result...")
         if not os.path.isdir(self.test_result_dir):
             os.mkdir(self.test_result_dir)
-        np.save(os.path.join(self.test_result_dir, self.model.__name__ + '_x.npy'), best_p)
-        np.save(os.path.join(self.test_result_dir, self.model.__name__ + '_y.npy'), best_r)
+        np.save(os.path.join(self.test_result_dir, self.model.__name__ + "_x.npy"), best_p)
+        np.save(os.path.join(self.test_result_dir, self.model.__name__ + "_y.npy"), best_r)
         print("Finish storing")
+        self.logger.info("Finish storing")
 
     def test_one_epoch(self):
         test_score = []
         for batch in tqdm(list(range(self.test_batches))):
             self.get_test_batch(batch)
             batch_score = self.test_one_step()
-            test_score = test_score + batch_score
+            test_score += batch_score
         test_result = []
         for i in range(len(test_score)):
             for j in range(1, len(test_score[i])):
@@ -355,7 +391,8 @@ class Config(object):
             pr_y.append(float(correct) / (i + 1))
             pr_x.append(float(correct) / self.total_recall)
         auc = sklearn.metrics.auc(x=pr_x, y=pr_y)
-        print(("auc: ", auc))
+        print("auc: ", auc)
+        self.logger.info("auc: ", auc)
         return auc, pr_x, pr_y
 
     def test(self):
@@ -364,10 +401,11 @@ class Config(object):
         best_p = None
         best_r = None
         for epoch in self.epoch_range:
-            path = os.path.join(self.checkpoint_dir, self.model.__name__ + '-' + str(epoch))
+            path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch))
             if not os.path.exists(path):
                 continue
-            print(("Start testing epoch %d" % (epoch)))
+            print("Start testing epoch %d" % epoch)
+            self.logger.info("Start testing epoch %d" % epoch)
             self.testModel.load_state_dict(torch.load(path))
             auc, p, r = self.test_one_epoch()
             if auc > best_auc:
@@ -375,11 +413,16 @@ class Config(object):
                 best_epoch = epoch
                 best_p = p
                 best_r = r
-            print(("Finish testing epoch %d" % (epoch)))
+            print("Finish testing epoch %d" % epoch)
+            self.logger.info("Finish testing epoch %d" % epoch)
+
         print(("Best epoch = %d | auc = %f" % (best_epoch, best_auc)))
+        self.logger.info("Best epoch = %d | auc = %f" % (best_epoch, best_auc))
         print("Storing best result...")
+        self.logger.info("Storing best result...")
         if not os.path.isdir(self.test_result_dir):
             os.mkdir(self.test_result_dir)
-        np.save(os.path.join(self.test_result_dir, self.model.__name__ + '_x.npy'), best_p)
-        np.save(os.path.join(self.test_result_dir, self.model.__name__ + '_y.npy'), best_r)
+        np.save(os.path.join(self.test_result_dir, self.model.__name__ + "_x.npy"), best_p)
+        np.save(os.path.join(self.test_result_dir, self.model.__name__ + "_y.npy"), best_r)
         print("Finish storing")
+        self.logger.info("Finish storing")

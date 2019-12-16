@@ -1,0 +1,8 @@
+mini_dataset-*
+raw_data*
+logs/
+data/
+__pycache__*
+.idea*
+
+*.pyc

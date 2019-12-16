@@ -1,5 +1,5 @@
 from networks.embedding import *
-from models.attention import TransformerEncoder
+from .attention import *
 
 
 class _CNN(nn.Module):
@@ -7,8 +7,8 @@ class _CNN(nn.Module):
         super(_CNN, self).__init__()
         self.config = config
         self.in_channels = 1
-        self.in_height = self.config.max_length
-        self.in_width = self.config.word_size + 2 * self.config.pos_size
+        self.in_height = self.config.max_sen_length
+        self.in_width = self.config.input_dim
         self.kernel_size = (self.config.window_size, self.in_width)
         self.out_channels = self.config.hidden_size
         self.stride = (1, 1)
@@ -24,7 +24,7 @@ class _PiecewisePooling(nn.Module):
         super(_PiecewisePooling, self).__init__()
 
     def forward(self, x, mask, hidden_size):
-        # mask = torch.unsqueeze(mask, 1)
+        mask = torch.unsqueeze(mask, 1)
         x, _ = torch.max(x, dim=2)
         x = x - 100
         return x.view(-1, hidden_size * 3)
@@ -70,20 +70,18 @@ class CNN(nn.Module):
         return self.activation(x)
 
 
-# in pyTorch lstm takes a 3-dim tensor as input, where the first dim represents the sentence_len,
+# in pyTorch BiGru takes a 3-dim tensor as input, where the first dim represents the sentence_len,
 # the second dim represents the batch_size,, and the third dim represents the word embedding_size
-class BLSTM(nn.Module):
+class BiGru(nn.Module):
     def __init__(self, config):
-        super(BLSTM, self).__init__()
+        super(BiGru, self).__init__()
         self.config = config
         self.embedding = Embedding(config)
-        # self.batch_size = config.batch_size  # bag size
         self.sentence_len = config.sentence_len  # 120
         self.dropout = config.dropout  # 0.1
-        self.in_channels = config.in_channels  #
-        self.out_channels = config.d_model // 2  # hidden dim // 2 = 512 // 2 = 256
-        self.rnn = nn.LSTM(input_size=self.in_channels, hidden_size=self.out_channels, bidirectional=True)
-        # self.hidden = self.init_hidden()  # (2, 120, 256)
+        self.input_dim = config.input_dim  #
+        self.out_channels = config.d_model // 2  # hidden dim // 2 = 256 // 2 = 256
+        self.rnn = nn.GRU(input_size=self.input_dim, hidden_size=self.out_channels, bidirectional=True)
         self.attn = TransformerEncoder(config)
 
     def init_hidden(self):
@@ -96,13 +94,39 @@ class BLSTM(nn.Module):
 
     def forward(self, embedding):
         """
-        :param embedding: word embeddings sentences, (n, sen_len=120, embedding_size=60)
+        :param embedding: word embeddings sentences, (n=batch_size/sen_num, sen_len=120, embedding_size=60)
         """
         embedding = embedding.permute(1, 0, 2)  # (sen_len=120, n, embedding_size=60)
-        lstm_out, self.hidden = self.rnn(embedding)  # lstm stores the final state for all
-        x = lstm_out.permute(1, 0, 2)  # (120, n, 256) -> (n, sen_len=120, 256)
-        x = self.attn(x)  # (n, sen_len=120, 256) ->  (n, sen_len=120, 256)
-        x = torch.sum(x, 1).unsqueeze(0)  # (n, sen_len=120, 256) ->  (n, sen_len=120, 1)
-        return x
+        lstm_final_all, final_hidden = self.rnn(embedding)  # lstm_out(120, n, 256) stores the final state for all
+        del lstm_final_all
+        final_hidden = final_hidden.view(1, -1, 256)  # (2, sen_num, 128) -> (1, sen_num, 256)
+        # final_hidden = final_hidden.permute(1, 0, 2)  # (1, n, 256) -> (n, 1, 256)
+        return final_hidden
 
 
+class TransformerEncoder(nn.Module):
+    def __init__(self, config):
+        super(TransformerEncoder, self).__init__()
+        self.encoders = nn.ModuleList(
+            [
+                EncoderBlock(d_model=config.d_model, d_feature=config.d_model // config.n_heads, n_heads=config.n_heads,
+                             d_ff=config.d_ff, dropout=config.dropout)
+                for _ in range(config.n_blocks)
+            ]
+        )
+        self.pooling = _MaxPooling()
+
+    def forward(self, x):
+        """
+        x : output of BLstm, (n=batch_size, l=sen_len, 256)
+        """
+        for encoder in self.encoders:
+            x = encoder(x)
+        # x = (n, l, 256)
+        # perform max pooling in one sentence
+        x, _ = torch.max(x, dim=1)
+        return x.unsqueeze(1).permute(1, 0, 2)  # (n, 1, 256)
+
+
+class SoftAttention(nn.Module):
+    pass

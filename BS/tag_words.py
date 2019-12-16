@@ -1,7 +1,6 @@
 import numpy as np
 import os
 import json
-import nltk
 
 
 def find_pos(sentence, head, tail):
@@ -9,11 +8,11 @@ def find_pos(sentence, head, tail):
     找到头尾实体在句子中的位置（头尾实体可能是单词或者词组）
     """
     def find_entity(sentence, entity):
-        p = sentence.find(' ' + entity + ' ')
+        p = sentence.find(" " + entity + " ")
         if p == -1:
-            if sentence[:len(entity) + 1] == entity + ' ':
+            if sentence[:len(entity) + 1] == entity + " ":
                 p = 0
-            elif sentence[-len(entity) - 1:] == ' ' + entity:
+            elif sentence[-len(entity) - 1:] == " " + entity:
                 p = len(sentence) - len(entity)
             else:
                 p = 0
@@ -21,7 +20,7 @@ def find_pos(sentence, head, tail):
             p += 1
         return p
 
-    sentence = ' '.join(sentence.split())
+    sentence = " ".join(sentence.split())
     p1 = find_entity(sentence, head)
     p2 = find_entity(sentence, tail)
     words = sentence.split()
@@ -40,14 +39,14 @@ def find_pos(sentence, head, tail):
 def init(file_name, word_vec_file_name, rel2id_file_name, postag2id_file_name=None, sen_max_length=120,
          case_sensitive=False, is_training=True):
     if file_name is None or not os.path.isfile(file_name):
-        raise Exception("[ERROR] Data file doesn't exist")
+        raise Exception("[ERROR] Data file does not exist")
     if word_vec_file_name is None or not os.path.isfile(word_vec_file_name):
-        raise Exception("[ERROR] Word vector file doesn't exist")
+        raise Exception("[ERROR] Word vector file does not exist")
     if rel2id_file_name is None or not os.path.isfile(rel2id_file_name):
-        raise Exception("[ERROR] rel2id file doesn't exist")
+        raise Exception("[ERROR] rel2id file does not exist")
 
     print("Loading data file...")
-    ori_data = json.load(open(file_name, "r"))[:1000]
+    ori_data = json.load(open(file_name, "r"))
     print("Finish loading")
     print("Loading word_vec file...")
     ori_word_vec = json.load(open(word_vec_file_name, "r"))
@@ -55,16 +54,15 @@ def init(file_name, word_vec_file_name, rel2id_file_name, postag2id_file_name=No
     print("Loading rel2id file...")
     rel2id = json.load(open(rel2id_file_name, "r"))
     print("Finish loading")
-    # postag2id = json.load(open(postag2id_file_name, "r"))
 
     if not case_sensitive:
         print("Eliminating case sensitive problem...")
         for i in ori_data:
-            i['sentence'] = i['sentence'].lower()
-            i['head']['word'] = i['head']['word'].lower()
-            i['tail']['word'] = i['tail']['word'].lower()
+            i["sentence"] = i["sentence"].lower()
+            i["head"]["word"] = i["head"]["word"].lower()
+            i["tail"]["word"] = i["tail"]["word"].lower()
         for i in ori_word_vec:
-            i['word'] = i['word'].lower()
+            i["word"] = i["word"].lower()
         print("Finish eliminating")
 
     # vec
@@ -72,17 +70,16 @@ def init(file_name, word_vec_file_name, rel2id_file_name, postag2id_file_name=No
     print("Start building word vector matrix and mapping...")
     word2id = {}
     word_vec_mat = []
-    word_vec_size = len(ori_word_vec[0]['vec'])
+    word_vec_size = len(ori_word_vec[0]["vec"])
     print(("Got {} words of {} dims".format(len(ori_word_vec), word_vec_size)))
     for i in ori_word_vec:
-        word2id[i['word']] = len(word2id)
-        word_vec_mat.append(i['vec'])
+        word2id[i["word"]] = len(word2id)
+        word_vec_mat.append(i["vec"])
     print("start convert postag martix")
-    pos2id = {}
 
     # add unknown and blank tag to wordvec and word2id map
-    word2id['UNK'] = len(word2id)
-    word2id['BLANK'] = len(word2id)
+    word2id["UNK"] = len(word2id)
+    word2id["BLANK"] = len(word2id)
     # unknown
     word_vec_mat.append(np.random.normal(loc=0, scale=0.05, size=word_vec_size))
     # Blank
@@ -93,14 +90,13 @@ def init(file_name, word_vec_file_name, rel2id_file_name, postag2id_file_name=No
     # sort corpus by head entity id, tail id then relation id
     print("Sorting data...")
     # here we sort all sentences so we can
-    ori_data.sort(key=lambda a: a['head']['id'] + '#' + a['tail']['id'] + '#' + a['relation'])
+    ori_data.sort(key=lambda a: a["head"]["id"] + "#" + a["tail"]["id"] + "#" + a["relation"])
     print("Finish sorting")
 
     sen_num = len(ori_data)
     sen_word = np.zeros((sen_num, sen_max_length), dtype=np.int64)
     sen_pos1 = np.zeros((sen_num, sen_max_length), dtype=np.int64)
     sen_pos2 = np.zeros((sen_num, sen_max_length), dtype=np.int64)
-    sen_postags = np.zeros((sen_num, sen_max_length), dtype=np.int64)
     # sen_mask = np.zeros((sen_num, sen_max_length, 3), dtype = np.float32)
     senid_2_relationid = np.zeros((sen_num), dtype=np.int64)
     sen_len = np.zeros((sen_num), dtype=np.int64)
@@ -113,13 +109,12 @@ def init(file_name, word_vec_file_name, rel2id_file_name, postag2id_file_name=No
             print(i)
         sen = ori_data[i]
         # sen_label
-        if sen['relation'] in rel2id:
-            senid_2_relationid[i] = rel2id[sen['relation']]
+        if sen["relation"] in rel2id:
+            senid_2_relationid[i] = rel2id[sen["relation"]]
         else:
-            senid_2_relationid[i] = rel2id['NA']
-        words = sen['sentence'].split()
-        # tokens = nltk.word_tokenize(sen['sentence'])
-        # postags = nltk.pos_tag(tokens)
+            senid_2_relationid[i] = rel2id["NA"]
+        words = sen["sentence"].split()
+
         # sen_len
         sen_len[i] = min(len(words), sen_max_length)
         # sen_word
@@ -128,19 +123,19 @@ def init(file_name, word_vec_file_name, rel2id_file_name, postag2id_file_name=No
                 if word in word2id:
                     sen_word[i][j] = word2id[word]
                 else:
-                    sen_word[i][j] = word2id['UNK']
+                    sen_word[i][j] = word2id["UNK"]
             # if postag in pos2id:
 
         for j in range(j + 1, sen_max_length):
             # 句子之外的 pad为blank
-            sen_word[i][j] = word2id['BLANK']
+            sen_word[i][j] = word2id["BLANK"]
 
-        pos1, pos2 = find_pos(sen['sentence'], sen['head']['word'], sen['tail']['word'])
+        pos1, pos2 = find_pos(sen["sentence"], sen["head"]["word"], sen["tail"]["word"])
         if pos1 == -1 or pos2 == -1:
             raise Exception(
-                "[ERROR] Position error, index = {}, sentence = {}, head = {}, tail = {}".format(i, sen['sentence'],
-                                                                                                 sen['head']['word'],
-                                                                                                 sen['tail']['word']))
+                "[ERROR] Position error, index = {}, sentence = {}, head = {}, tail = {}".format(i, sen["sentence"],
+                                                                                                 sen["head"]["word"],
+                                                                                                 sen["tail"]["word"]))
         if pos1 >= sen_max_length:
             pos1 = sen_max_length - 1
         if pos2 >= sen_max_length:
@@ -162,9 +157,9 @@ def init(file_name, word_vec_file_name, rel2id_file_name, postag2id_file_name=No
         # 	sen_mask[i][j] = [0, 0, 100]
         # bag_scope
         if is_training:
-            tup = (sen['head']['id'], sen['tail']['id'], sen['relation'])
+            tup = (sen["head"]["id"], sen["tail"]["id"], sen["relation"])
         else:
-            tup = (sen['head']['id'], sen['tail']['id'])
+            tup = (sen["head"]["id"], sen["tail"]["id"])
         if bag_key == [] or bag_key[len(bag_key) - 1] != tup:
             bag_key.append(tup)
             bag_scope.append([i, i])
@@ -211,29 +206,29 @@ def init(file_name, word_vec_file_name, rel2id_file_name, postag2id_file_name=No
         name_prefix = "train"
     else:
         name_prefix = "test"
-    np.save(os.path.join(out_path, 'vec.npy'), word_vec_mat)
-    np.save(os.path.join(out_path, name_prefix + '_word.npy'), sen_word)
-    np.save(os.path.join(out_path, name_prefix + '_pos1.npy'), sen_pos1)
-    np.save(os.path.join(out_path, name_prefix + '_pos2.npy'), sen_pos2)
-    # np.save(os.path.join(out_path, name_prefix + '_mask.npy'), sen_mask)
-    np.save(os.path.join(out_path, name_prefix + '_bag_label.npy'), bag_label)
-    np.save(os.path.join(out_path, name_prefix + '_bag_scope.npy'), bag_scope)
-    np.save(os.path.join(out_path, name_prefix + '_ins_label.npy'), ins_label)
-    np.save(os.path.join(out_path, name_prefix + '_ins_scope.npy'), ins_scope)
+    np.save(os.path.join(out_path, "vec.npy"), word_vec_mat)
+    np.save(os.path.join(out_path, name_prefix + "_word.npy"), sen_word)
+    np.save(os.path.join(out_path, name_prefix + "_pos1.npy"), sen_pos1)
+    np.save(os.path.join(out_path, name_prefix + "_pos2.npy"), sen_pos2)
+    # np.save(os.path.join(out_path, name_prefix + "_mask.npy"), sen_mask)
+    np.save(os.path.join(out_path, name_prefix + "_bag_label.npy"), bag_label)
+    np.save(os.path.join(out_path, name_prefix + "_bag_scope.npy"), bag_scope)
+    np.save(os.path.join(out_path, name_prefix + "_ins_label.npy"), ins_label)
+    np.save(os.path.join(out_path, name_prefix + "_ins_scope.npy"), ins_scope)
     print("Finish saving")
 
 
 if __name__ == "__main__":
 
     in_path = "./raw_data/"
-    out_path = "./mini_dataset-1000"
+    out_path = "./data"
     case_sensitive = False
     if not os.path.exists(out_path):
         os.mkdir(out_path)
-    train_file_name = in_path + 'train.json'
-    test_file_name = in_path + 'test.json'
-    word_file_name = in_path + 'word_vec.json'
-    rel_file_name = in_path + 'rel2id.json'
+    train_file_name = in_path + "train.json"
+    test_file_name = in_path + "test.json"
+    word_file_name = in_path + "word_vec.json"
+    rel_file_name = in_path + "rel2id.json"
 
     init(train_file_name, word_file_name, rel_file_name, sen_max_length=120, case_sensitive=False, is_training=True)
     init(test_file_name, word_file_name, rel_file_name, sen_max_length=120, case_sensitive=False, is_training=False)

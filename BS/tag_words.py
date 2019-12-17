@@ -36,7 +36,7 @@ def find_pos(sentence, head, tail):
     return pos1, pos2
 
 
-def init(file_name, word_vec_file_name, rel2id_file_name, postag2id_file_name=None, sen_max_length=120,
+def init(file_name, word_vec_file_name, rel2id_file_name, sen_max_length=120,
          case_sensitive=False, is_training=True):
     if file_name is None or not os.path.isfile(file_name):
         raise Exception("[ERROR] Data file does not exist")
@@ -65,8 +65,6 @@ def init(file_name, word_vec_file_name, rel2id_file_name, postag2id_file_name=No
             i["word"] = i["word"].lower()
         print("Finish eliminating")
 
-    # vec
-    # map word to one-hot
     print("Start building word vector matrix and mapping...")
     word2id = {}
     word_vec_mat = []
@@ -75,7 +73,6 @@ def init(file_name, word_vec_file_name, rel2id_file_name, postag2id_file_name=No
     for i in ori_word_vec:
         word2id[i["word"]] = len(word2id)
         word_vec_mat.append(i["vec"])
-    print("start convert postag martix")
 
     # add unknown and blank tag to wordvec and word2id map
     word2id["UNK"] = len(word2id)
@@ -124,7 +121,6 @@ def init(file_name, word_vec_file_name, rel2id_file_name, postag2id_file_name=No
                     sen_word[i][j] = word2id[word]
                 else:
                     sen_word[i][j] = word2id["UNK"]
-            # if postag in pos2id:
 
         for j in range(j + 1, sen_max_length):
             # 句子之外的 pad为blank

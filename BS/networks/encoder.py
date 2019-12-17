@@ -99,7 +99,7 @@ class BiGru(nn.Module):
         embedding = embedding.permute(1, 0, 2)  # (sen_len=120, n, embedding_size=60)
         lstm_final_all, final_hidden = self.rnn(embedding)  # lstm_out(120, n, 256) stores the final state for all
         del lstm_final_all
-        final_hidden = final_hidden.view(1, -1, 256)  # (2, sen_num, 128) -> (1, sen_num, 256)
+        final_hidden = final_hidden.view(1, -1, self.config.out_channels)  # (2, sen_num, 128) -> (1, sen_num, 256)
         # final_hidden = final_hidden.permute(1, 0, 2)  # (1, n, 256) -> (n, 1, 256)
         return final_hidden
 
@@ -122,9 +122,10 @@ class TransformerEncoder(nn.Module):
         """
         for encoder in self.encoders:
             x = encoder(x)
-        # x = (n, l, 256)
+        # x: (n, l, 256)
         # perform max pooling in one sentence
         x, _ = torch.max(x, dim=1)
+        del _  # save memory
         return x.unsqueeze(1).permute(1, 0, 2)  # (n, 1, 256)
 
 

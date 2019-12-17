@@ -164,8 +164,9 @@ class BagAttention(Selector):
             temp_x = temp_x.squeeze()  # (1, 256)/(1, 1, 256) -> (256)
             all_bag_vec.append(temp_x)
         all_bag_vec = torch.stack(all_bag_vec)  # (bags in batch, 256)
-        # all_bag_vec = self.dropout(all_bag_vec)
+        all_bag_vec = self.dropout(all_bag_vec)
         logits = self.get_logits(all_bag_vec)  # (bags in batch, 256) -> (bags in batch, 52/relation_num)
+        del all_bag_vec
         # logits = F.softmax(logits, dim=1)  # (bags in batch, 53)
         return logits
 
@@ -182,5 +183,13 @@ class BagAttention(Selector):
         all_bag_vec = torch.stack(all_bag_vec)  # (bags in batch, 256)
         # all_bag_vec = self.dropout(all_bag_vec)
         logits = self.get_logits(all_bag_vec)  # (bags in batch, 256) -> (bags in batch, 52/relation_num)
+        # del all_bag_vec
         logits = F.softmax(logits, dim=1)  # (bags in batch, 53)
         return list(logits.data.cpu().numpy())
+
+
+class LayerAtt(nn.Module):
+    def __init__(self, config, encoder_output_dim):
+        super(LayerAtt, self).__init__()
+        self.sen_bag_attn = Attention(config, encoder_output_dim)
+        self.super_bag_attn = Attention(config, encoder_output_dim)

@@ -63,6 +63,7 @@ class Config(object):
         self.window_size = 3
         self.epoch_range = None
         self.input_dim = self.word_embedding_dim + self.pos_embedding_dim * 2  # input dim
+        self.save_iter = 1000
 
     def init_logger(self, log_name):
         if not os.path.exists(self.log_dir):
@@ -285,9 +286,9 @@ class Config(object):
         self.optimizer.step()
         loss = loss.cpu().detach().numpy()
         print("prediction: ", _output.tolist())
-        print("gt label: ", self.batch_label)
+        print("gt label:   ", self.batch_label.tolist())
         self.logger.info("prediction: " + str(_output.tolist()))
-        self.logger.info("gt label: " + str(self.batch_label))
+        self.logger.info("gt label: " + str(self.batch_label.tolist()))
         for i, prediction in enumerate(_output):
             # print(prediction.data)
             # print(self.batch_label[i])
@@ -341,12 +342,17 @@ class Config(object):
                                      epoch, batch_num, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(),
                                      self.acc_total.get())
                                  )
+                if (batch_num + 1) % self.save_iter == 0:
+                    print("Saving model at Epoch: {0}, iteration: {1}.".format(epoch + 1, batch_num + 1))
+                    path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-{0}_{1}-{2}".format(epoch + 1, batch_num+1, self.acc_not_NA.get()))
+                    torch.save(self.trainModel.state_dict(), path)
+
             if (epoch + 1) % self.save_epoch == 0:
-                print("Epoch " + str(epoch + 1) + " has finished")
+                print("Epoch {} has finished".format(epoch + 1))
                 print("Saving model...")
-                self.logger.info("Epoch " + str(epoch + 1) + " has finished")
+                self.logger.info("Epoch {} has finished".format(epoch + 1))
                 self.logger.info("Saving model...")
-                path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch))
+                path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch+1))
                 torch.save(self.trainModel.state_dict(), path)
                 print("Have saved model to " + path)
                 self.logger.info("Have saved model to " + path)

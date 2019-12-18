@@ -7,6 +7,7 @@ def find_pos(sentence, head, tail):
     """
     找到头尾实体在句子中的位置（头尾实体可能是单词或者词组）
     """
+
     def find_entity(sentence, entity):
         p = sentence.find(" " + entity + " ")
         if p == -1:
@@ -37,7 +38,7 @@ def find_pos(sentence, head, tail):
 
 
 def init(file_name, word_vec_file_name, rel2id_file_name, sen_max_length=120,
-         case_sensitive=False, is_training=True):
+         case_sensitive=False, is_training=True, small_bag=None):
     if file_name is None or not os.path.isfile(file_name):
         raise Exception("[ERROR] Data file does not exist")
     if word_vec_file_name is None or not os.path.isfile(word_vec_file_name):
@@ -46,12 +47,17 @@ def init(file_name, word_vec_file_name, rel2id_file_name, sen_max_length=120,
         raise Exception("[ERROR] rel2id file does not exist")
 
     print("Loading data file...")
+    # ori_data:{"head":{"type":head entity type,"word":head entity word, "id":head entity id in kb}
+    #           "tail":{"type":"","word":"", id}
+    #           "sentence":the sentence}
     ori_data = json.load(open(file_name, "r"))
     print("Finish loading")
     print("Loading word_vec file...")
+    # ori_word_vec:{"word":word_str, "vec":word_vec}
     ori_word_vec = json.load(open(word_vec_file_name, "r"))
     print("Finish loading")
     print("Loading rel2id file...")
+    # rel2id: {relation_str: id}
     rel2id = json.load(open(rel2id_file_name, "r"))
     print("Finish loading")
 
@@ -62,57 +68,61 @@ def init(file_name, word_vec_file_name, rel2id_file_name, sen_max_length=120,
             i["head"]["word"] = i["head"]["word"].lower()
             i["tail"]["word"] = i["tail"]["word"].lower()
         for i in ori_word_vec:
+            # convert all words in word2vec file to lower case
             i["word"] = i["word"].lower()
         print("Finish eliminating")
 
     print("Start building word vector matrix and mapping...")
     word2id = {}
-    word_vec_mat = []
+    word_vec_matrix = []  # stores all word2vec vector
     word_vec_size = len(ori_word_vec[0]["vec"])
     print(("Got {} words of {} dims".format(len(ori_word_vec), word_vec_size)))
     for i in ori_word_vec:
+        # mapping word to id
         word2id[i["word"]] = len(word2id)
-        word_vec_mat.append(i["vec"])
+        word_vec_matrix.append(i["vec"])
 
     # add unknown and blank tag to wordvec and word2id map
     word2id["UNK"] = len(word2id)
     word2id["BLANK"] = len(word2id)
-    # unknown
-    word_vec_mat.append(np.random.normal(loc=0, scale=0.05, size=word_vec_size))
-    # Blank
-    word_vec_mat.append(np.zeros(word_vec_size, dtype=np.float32))
-    word_vec_mat = np.array(word_vec_mat, dtype=np.float32)
+    # use a normal distribution to represent Unknown label
+    word_vec_matrix.append(np.random.normal(loc=0, scale=0.05, size=word_vec_size))
+    # use zeros to represent Blank label
+    word_vec_matrix.append(np.zeros(word_vec_size, dtype=np.float32))
+    # to np
+    word_vec_matrix = np.array(word_vec_matrix, dtype=np.float32)
     print("Finish building")
 
     # sort corpus by head entity id, tail id then relation id
-    print("Sorting data...")
+    print("Sorting Corpus...")
     # here we sort all sentences so we can
     ori_data.sort(key=lambda a: a["head"]["id"] + "#" + a["tail"]["id"] + "#" + a["relation"])
     print("Finish sorting")
 
     sen_num = len(ori_data)
-    sen_word = np.zeros((sen_num, sen_max_length), dtype=np.int64)
+    sen_word = np.zeros((sen_num, sen_max_length), dtype=np.int64)  # convert each word in sentence to word id
     sen_pos1 = np.zeros((sen_num, sen_max_length), dtype=np.int64)
     sen_pos2 = np.zeros((sen_num, sen_max_length), dtype=np.int64)
     # sen_mask = np.zeros((sen_num, sen_max_length, 3), dtype = np.float32)
-    senid_2_relationid = np.zeros((sen_num), dtype=np.int64)
-    sen_len = np.zeros((sen_num), dtype=np.int64)
+    senid_2_relationid = np.zeros(sen_num, dtype=np.int64)
+    sen_len = np.zeros(sen_num, dtype=np.int64)  # 保存每个句子的长度
     bag_label = []
-    bag_scope = []  # used to mark [i:j] sentences are the same label
+    bag_scope = []  # used to record [i:j] sentences are the same label
     bag_key = []
 
     for i in range(len(ori_data)):
         if i % 1000 == 0:
             print(i)
-        sen = ori_data[i]
+        data = ori_data[i]
         # sen_label
-        if sen["relation"] in rel2id:
-            senid_2_relationid[i] = rel2id[sen["relation"]]
+        if data["relation"] in rel2id:
+            # 如果这句话的relation 在rel2id词典中，就保存relation id
+            senid_2_relationid[i] = rel2id[data["relation"]]
         else:
             senid_2_relationid[i] = rel2id["NA"]
-        words = sen["sentence"].split()
+        words = data["sentence"].split()
 
-        # sen_len
+        # each sen len
         sen_len[i] = min(len(words), sen_max_length)
         # sen_word
         for j, word in enumerate(words):
@@ -123,15 +133,15 @@ def init(file_name, word_vec_file_name, rel2id_file_name, sen_max_length=120,
                     sen_word[i][j] = word2id["UNK"]
 
         for j in range(j + 1, sen_max_length):
-            # 句子之外的 pad为blank
+            # 长度不足部分pad为blank word
             sen_word[i][j] = word2id["BLANK"]
 
-        pos1, pos2 = find_pos(sen["sentence"], sen["head"]["word"], sen["tail"]["word"])
+        pos1, pos2 = find_pos(data["sentence"], data["head"]["word"], data["tail"]["word"])
         if pos1 == -1 or pos2 == -1:
             raise Exception(
-                "[ERROR] Position error, index = {}, sentence = {}, head = {}, tail = {}".format(i, sen["sentence"],
-                                                                                                 sen["head"]["word"],
-                                                                                                 sen["tail"]["word"]))
+                "[ERROR] Position error, index = {}, sentence = {}, head = {}, tail = {}".format(i, data["sentence"],
+                                                                                                 data["head"]["word"],
+                                                                                                 data["tail"]["word"]))
         if pos1 >= sen_max_length:
             pos1 = sen_max_length - 1
         if pos2 >= sen_max_length:
@@ -153,16 +163,21 @@ def init(file_name, word_vec_file_name, rel2id_file_name, sen_max_length=120,
         # 	sen_mask[i][j] = [0, 0, 100]
         # bag_scope
         if is_training:
-            tup = (sen["head"]["id"], sen["tail"]["id"], sen["relation"])
+            tup = (data["head"]["id"], data["tail"]["id"], data["relation"])
         else:
-            tup = (sen["head"]["id"], sen["tail"]["id"])
-        if bag_key == [] or bag_key[len(bag_key) - 1] != tup:
+            # test data，只考虑是不是一个实体对
+            tup = (data["head"]["id"], data["tail"]["id"])
+        # 三元组/二元组有变，开辟新的scope
+        if bag_key == [] or bag_key[-1] != tup or (small_bag and i - bag_scope[len(bag_scope) - 1][1] > small_bag):
             bag_key.append(tup)
             bag_scope.append([i, i])
-        bag_scope[len(bag_scope) - 1][1] = i
+        else:  # 不是新的scope，更新之前的scope
+            bag_scope[len(bag_scope) - 1][1] = i
 
     print("Processing bag label...")
-    # bag_label
+    # bag_label: stores label id for each bag in training,
+    # and label id for each sentence in a bag, multi hot,
+    # when testing, we hope the model to predict all relations in a bag
     if is_training:
         # fot training data, a bag of sentences have the same entity pair
         for each_scope in bag_scope:
@@ -179,8 +194,9 @@ def init(file_name, word_vec_file_name, rel2id_file_name, sen_max_length=120,
     # ins_scope
     ins_scope = np.stack([list(range(sen_num)), list(range(sen_num))], axis=1)  # (n, n)
     print("Processing instance label...")
-    # ins_label
+    # sentence label
     if is_training:
+        # for training data
         ins_label = senid_2_relationid  # assign real label to training sentences
     else:
         ins_label = []
@@ -202,7 +218,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, sen_max_length=120,
         name_prefix = "train"
     else:
         name_prefix = "test"
-    np.save(os.path.join(out_path, "vec.npy"), word_vec_mat)
+    np.save(os.path.join(out_path, "vec.npy"), word_vec_matrix)
     np.save(os.path.join(out_path, name_prefix + "_word.npy"), sen_word)
     np.save(os.path.join(out_path, name_prefix + "_pos1.npy"), sen_pos1)
     np.save(os.path.join(out_path, name_prefix + "_pos2.npy"), sen_pos2)
@@ -217,7 +233,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, sen_max_length=120,
 if __name__ == "__main__":
 
     in_path = "./raw_data/"
-    out_path = "./data"
+    out_path = "data_smallbag"
     case_sensitive = False
     if not os.path.exists(out_path):
         os.mkdir(out_path)
@@ -226,5 +242,5 @@ if __name__ == "__main__":
     word_file_name = in_path + "word_vec.json"
     rel_file_name = in_path + "rel2id.json"
 
-    init(train_file_name, word_file_name, rel_file_name, sen_max_length=120, case_sensitive=False, is_training=True)
-    init(test_file_name, word_file_name, rel_file_name, sen_max_length=120, case_sensitive=False, is_training=False)
+    init(train_file_name, word_file_name, rel_file_name, sen_max_length=230, case_sensitive=False, is_training=True, small_bag=20)
+    init(test_file_name, word_file_name, rel_file_name, sen_max_length=230, case_sensitive=False, is_training=False, small_bag=20)

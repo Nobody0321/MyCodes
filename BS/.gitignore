@@ -2,8 +2,9 @@ mini_dataset-*
 checkpoint*
 raw_data*
 logs/
-data/
+data*/
 __pycache__*
 .idea*
 
+*.log
 *.pyc

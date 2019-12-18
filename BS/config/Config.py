@@ -42,7 +42,7 @@ class Config(object):
         self.max_sen_length = 120  # max sentnece lem
         self.pos_num = 2 * self.max_sen_length  # num of positions = 240
         self.num_classes = 53  # num of relations
-        self.hidden_dim = 230  # output dim for pool layer in pcnn
+        self.hidden_dim = 230  # output dim encoder
         self.word_embedding_dim = 50  # word embedding dim
         self.pos_embedding_dim = 5
         self.max_epoch = 15
@@ -58,12 +58,13 @@ class Config(object):
         self.pretrain_model = None
         self.trainModel = None
         self.testModel = None
-        self.batch_size = 50
+        self.batch_size = 160
         self.sentence_len = 120
         self.window_size = 3
         self.epoch_range = None
         self.input_dim = self.word_embedding_dim + self.pos_embedding_dim * 2  # input dim
         self.save_iter = 1000
+        self.attn_dropout = 0.1
 
     def init_logger(self, log_name):
         if not os.path.exists(self.log_dir):
@@ -141,7 +142,7 @@ class Config(object):
     def set_epoch_range(self, epoch_range):
         self.epoch_range = epoch_range
 
-    def to_var(self, x):
+    def to_tensor(self, x):
         if self.use_gpu:
             return torch.from_numpy(x).cuda()
         else:
@@ -189,6 +190,7 @@ class Config(object):
         if len(self.data_test_label) % self.batch_size != 0:
             self.test_batches += 1
 
+        # all positive
         self.total_recall = self.data_test_label[:, 1:].sum()
 
     def set_train_model(self, model):
@@ -272,15 +274,24 @@ class Config(object):
     def train_one_step(self):
         self.trainModel.selector.scope = self.batch_scope
         # assign batch word2vec to embedding.word
-        self.trainModel.embedding.word = self.to_var(self.word_embedding_in_batch)
-        self.trainModel.embedding.pos1 = self.to_var(self.postition_embedding1_in_batch)
-        self.trainModel.embedding.pos2 = self.to_var(self.postition_embedding2_in_batch)
+        self.trainModel.embedding.word = self.to_tensor(self.word_embedding_in_batch)
+        self.trainModel.embedding.pos1 = self.to_tensor(self.postition_embedding1_in_batch)
+        self.trainModel.embedding.pos2 = self.to_tensor(self.postition_embedding2_in_batch)
         # self.trainModel.encoder.mask = self.to_var(self.batch_mask)
-        self.trainModel.selector.attention_query = self.to_var(self.batch_attention_query)
-        self.trainModel.selector.label = self.to_var(self.batch_label)
-        self.trainModel.classifier.label = self.to_var(self.batch_label)
+        self.trainModel.selector.attention_query = self.to_tensor(self.batch_attention_query)
+        self.trainModel.selector.label = self.to_tensor(self.batch_label)
+        self.trainModel.classifier.label = self.to_tensor(self.batch_label)
         self.optimizer.zero_grad()  # clear gradient from last step
-        loss, _output = self.trainModel()  # loss and prediction result
+        try:
+            loss, _output = self.trainModel()  # loss and prediction result
+        except RuntimeError as e:
+            if "out of memory" in str(e):
+                print("WARNING: out of memory")
+                if hasattr(torch.cuda, 'empty_cache'):
+                    torch.cuda.empty_cache()
+                loss, _output = self.trainModel()  # loss and prediction result
+            else:
+                raise e
         _output = _output.cpu()
         loss.backward()
         self.optimizer.step()
@@ -290,8 +301,6 @@ class Config(object):
         self.logger.info("prediction: " + str(_output.tolist()))
         self.logger.info("gt label: " + str(self.batch_label.tolist()))
         for i, prediction in enumerate(_output):
-            # print(prediction.data)
-            # print(self.batch_label[i])
             if self.batch_label[i] == 0:
                 self.acc_NA.add(prediction == self.batch_label[i])
             else:
@@ -301,12 +310,22 @@ class Config(object):
 
     def test_one_step(self):
         self.testModel.selector.scope = self.batch_scope
-        self.testModel.embedding.word = self.to_var(self.word_embedding_in_batch)
-        self.testModel.embedding.pos1 = self.to_var(self.postition_embedding1_in_batch)
-        self.testModel.embedding.pos2 = self.to_var(self.postition_embedding2_in_batch)
+        self.testModel.embedding.word = self.to_tensor(self.word_embedding_in_batch)
+        self.testModel.embedding.pos1 = self.to_tensor(self.postition_embedding1_in_batch)
+        self.testModel.embedding.pos2 = self.to_tensor(self.postition_embedding2_in_batch)
         # self.testModel.encoder.mask = self.to_var(self.batch_mask)
         # no label in test, we do not need labels to calculate loss
-        return self.testModel.test()  # only returns classification result, no need for loss
+        try:
+            score = self.testModel.test()  # only returns classification result, no need for loss
+        except RuntimeError as e:
+            if "out of memory" in str(e):
+                print("WARNING: out of memory")
+                if hasattr(torch.cuda, 'empty_cache'):
+                    torch.cuda.empty_cache()
+                    score = self.testModel.test()  # only returns classification result, no need for loss
+            else:
+                raise e
+        return score
 
     def train(self):
         if not os.path.exists(self.checkpoint_dir):
@@ -315,10 +334,10 @@ class Config(object):
         best_p = None
         best_r = None
         best_epoch = 0
-        self.init_logger(self.model.__name__)
+        self.init_logger("train-" + self.model.__name__)
         for epoch in range(self.max_epoch):
-            print("Epoch " + str(epoch) + " starts...")
-            self.logger.info("Epoch " + str(epoch) + " starts...")
+            print("Epoch " + str(epoch + 1) + " starts...")
+            self.logger.info("Epoch " + str(epoch + 1) + " starts...")
             self.acc_NA.clear()
             self.acc_not_NA.clear()
             self.acc_total.clear()
@@ -327,24 +346,21 @@ class Config(object):
             for batch_num in range(self.train_batches_num):
                 self.get_train_batch(batch_num)
                 loss = self.train_one_step()
-                if np.isnan(loss):
-                    np.save("./embedding.npy", self.word_embedding_in_batch)
-                    np.save("./scope", np.array(self.batch_scope))
-                    return
+                # if np.isnan(loss):
+                #     np.save("./embedding.npy", self.word_embedding_in_batch)
+                #     np.save("./scope", np.array(self.batch_scope))
+                #     return
                 time_str = datetime.datetime.now().isoformat()
-                print(
-                    "epoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, total accuracy: %f\r" % (
-                        epoch, batch_num, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(),
-                        self.acc_total.get())
-                )
-                self.logger.info("epoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, "
-                                 "total accuracy: %f\r" % (
-                                     epoch, batch_num, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(),
-                                     self.acc_total.get())
-                                 )
+                info_massage = "epoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, " \
+                               "total accuracy: %f\r" % (
+                                   epoch + 1, batch_num + 1, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(),
+                                   self.acc_total.get())
+                print(info_massage)
+                self.logger.info(info_massage)
                 if (batch_num + 1) % self.save_iter == 0:
                     print("Saving model at Epoch: {0}, iteration: {1}.".format(epoch + 1, batch_num + 1))
-                    path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-{0}_{1}-{2}".format(epoch + 1, batch_num+1, self.acc_not_NA.get()))
+                    path = os.path.join(self.checkpoint_dir,
+                                        self.model.__name__ + "-{0}_{1}-{2}:{3}".format(epoch + 1, batch_num + 1, loss, self.acc_not_NA.get()))
                     torch.save(self.trainModel.state_dict(), path)
 
             if (epoch + 1) % self.save_epoch == 0:
@@ -352,7 +368,7 @@ class Config(object):
                 print("Saving model...")
                 self.logger.info("Epoch {} has finished".format(epoch + 1))
                 self.logger.info("Saving model...")
-                path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch+1))
+                path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch + 1))
                 torch.save(self.trainModel.state_dict(), path)
                 print("Have saved model to " + path)
                 self.logger.info("Have saved model to " + path)
@@ -364,12 +380,9 @@ class Config(object):
                     best_p = pr_x
                     best_r = pr_y
                     best_epoch = epoch
-        print("Finish training")
-        print(("Best epoch = %d | auc = %f" % (best_epoch, best_auc)))
-        print("Storing best result...")
-        self.logger.info("Finish training")
-        self.logger.info(("Best epoch = %d | auc = %f" % (best_epoch, best_auc)))
-        self.logger.info("Storing best result...")
+        info_massage = "Finish training\n" + "Best epoch = {0} | auc = {1}\n".format(best_epoch, best_auc) + "Storing best result..."
+        print(info_massage)
+        self.logger.info(info_massage)
         if not os.path.isdir(self.test_result_dir):
             os.mkdir(self.test_result_dir)
         np.save(os.path.join(self.test_result_dir, self.model.__name__ + "_x.npy"), best_p)
@@ -378,25 +391,37 @@ class Config(object):
         self.logger.info("Finish storing")
 
     def test_one_epoch(self):
+        """
+        when testing, a bag consisits of sens of the same entity pair but different relation
+        :return:
+        """
         test_score = []
         for batch in tqdm(list(range(self.test_batches))):
             self.get_test_batch(batch)
+            # batch_score [batch_size, 53], a bag and its multi relation scores
+            # batch_score 返回一个batch中每一个bag的multi hot relation score
             batch_score = self.test_one_step()
             test_score += batch_score
+        # test_score [epoch_size*[batch_size, 53}] stores each bag's multi-hot label
         test_result = []
+        # for each epoch
         for i in range(len(test_score)):
+            # for each batch
             for j in range(1, len(test_score[i])):
+                # skip relation 0: NA
+                # get each bag's gt and predicted  multi-hot label
                 test_result.append([self.data_test_label[i][j], test_score[i][j]])
-        test_result = sorted(test_result, key=lambda x: x[1])
-        test_result = test_result[::-1]
-        pr_x = []
-        pr_y = []
-        correct = 0
+        # test_result (epoch_size_of_sen, 53) stores each instance's label and predicted label score
+        # sort test_result by predicted score
+        test_result = sorted(test_result, key=lambda x: x[1], reverse=True)  # decrease
+        pr_x = []  # fpr
+        pr_y = []  # tpr
+        correct = 0  # tp
         for i, item in enumerate(test_result):
-            correct += item[0]
-            pr_y.append(float(correct) / (i + 1))
-            pr_x.append(float(correct) / self.total_recall)
-        auc = sklearn.metrics.auc(x=pr_x, y=pr_y)
+            correct += item[0]  # tp
+            pr_x.append(float(correct) / self.total_recall)  # tp/ =
+            pr_y.append(float(correct) / (i + 1))  # tp/p = tpr
+        auc = sklearn.metrics.auc(x=pr_x, y=pr_y)  # get auc
         print("auc: ", auc)
         self.logger.info("auc: ", auc)
         return auc, pr_x, pr_y
@@ -407,11 +432,11 @@ class Config(object):
         best_p = None
         best_r = None
         for epoch in self.epoch_range:
-            path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch))
+            path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch + 1))
             if not os.path.exists(path):
                 continue
-            print("Start testing epoch %d" % epoch)
-            self.logger.info("Start testing epoch %d" % epoch)
+            print("Start testing epoch %d" % epoch + 1)
+            self.logger.info("Start testing epoch %d" % epoch + 1)
             self.testModel.load_state_dict(torch.load(path))
             auc, p, r = self.test_one_epoch()
             if auc > best_auc:
@@ -419,11 +444,11 @@ class Config(object):
                 best_epoch = epoch
                 best_p = p
                 best_r = r
-            print("Finish testing epoch %d" % epoch)
-            self.logger.info("Finish testing epoch %d" % epoch)
+            print("Finish testing epoch %d" % epoch + 1)
+            self.logger.info("Finish testing epoch %d" % epoch + 1)
 
-        print(("Best epoch = %d | auc = %f" % (best_epoch, best_auc)))
-        self.logger.info("Best epoch = %d | auc = %f" % (best_epoch, best_auc))
+        print(("Best epoch = %d | auc = %f" % (best_epoch + 1, best_auc)))
+        self.logger.info("Best epoch = %d | auc = %f" % (best_epoch + 1, best_auc))
         print("Storing best result...")
         self.logger.info("Storing best result...")
         if not os.path.isdir(self.test_result_dir):

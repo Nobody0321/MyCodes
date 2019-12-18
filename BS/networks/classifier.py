@@ -11,8 +11,7 @@ class Classifier(nn.Module):
 
     def forward(self, logits):
         """
-
-        :param logits: selector output, (bag_num, 53/relation_num)
+        :param logits: selector output, before softmax (batch_size, 53/relation_num)
         :return: loss and predicted relation
         """
         loss = self.loss(logits, self.label)

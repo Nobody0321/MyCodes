@@ -1,17 +1,10 @@
 import torch
 import torch.nn as nn
 import math
-from enum import IntEnum
-
-
-class Dim(IntEnum):
-    batch = 0
-    seq = 1
-    feature = 2
 
 
 class ScaledDotProductAttention(nn.Module):
-    def __init__(self, dropout=0.1):
+    def __init__(self, dropout):
         super().__init__()
         self.dropout = nn.Dropout(dropout)
 
@@ -33,44 +26,40 @@ class ScaledDotProductAttention(nn.Module):
 
 
 class AttentionHead(nn.Module):
-    def __init__(self, d_model, d_feature, dropout=0.1):
+    def __init__(self, d_model, d_feature, dropout):
         super().__init__()
         # We will assume the queries, keys, and values all have the same feature size
         self.attn = ScaledDotProductAttention(dropout)
-        self.query_transform = nn.Linear(d_model, d_feature)
+        self.query_transform = nn.Linear(d_model, d_feature)  # (l, 60) -> (l, 12)
         self.key_transform = nn.Linear(d_model, d_feature)
         self.value_transform = nn.Linear(d_model, d_feature)
 
     def forward(self, queries, keys, values):
-        # (n, l, d_model) -> (n, l, d_feature)
+        # (n, l, 60) -> (n, l, 12)
         queries = self.query_transform(queries)
         keys = self.key_transform(keys)
         values = self.value_transform(values)
         # compute multiple attention weighted sums
-        x = self.attn(queries, keys, values)  # (n, l, d_feature)
+        x = self.attn(queries, keys, values)  # (n, l, 12)
         return x
 
 
 class MultiHeadAttention(nn.Module):
-    """The complete multi-head attention block"""
-
-    def __init__(self, d_model, d_feature, n_heads, dropout=0.1):
+    def __init__(self, d_model, n_heads, d_output, dropout):
         """
-        d_model: dim of the blstm output
+        d_model: dim of the input
         d_feature: dim of the Q, K, V
         """
         super().__init__()
-        # in practice, d_model == d_feature * n_heads
-        assert d_model == d_feature * n_heads
 
         self.d_model = d_model
-        self.d_feature = d_feature
+        self.d_feature = d_model // n_heads
         self.n_heads = n_heads
 
         self.attn_heads = nn.ModuleList([
-            AttentionHead(d_model, d_feature, dropout) for _ in range(n_heads)
+            AttentionHead(self.d_model, self.d_feature, dropout) for _ in range(n_heads)
         ])
-        self.projection = nn.Linear(d_feature * n_heads, d_model)
+        self.projection = nn.Linear(self.d_feature * n_heads, d_output)
 
     def forward(self, queries, keys, values):
         """
@@ -80,34 +69,33 @@ class MultiHeadAttention(nn.Module):
              for i, attn in enumerate(self.attn_heads)]
 
         # concatenate again
-        x = torch.cat(x, dim=Dim.feature)  # (n, l, d_feature * n_heads)
-        x = self.projection(x)  # (n, l, d_model)
+        x = torch.cat(x, dim=2)  # (n, l, 60)
+        x = self.projection(x)  # (n, l, 60) -> (n, l, 230)
         return x
 
 
 class EncoderBlock(nn.Module):
-    def __init__(self, d_model=512, d_feature=64,
-                 d_ff=2048, n_heads=8, dropout=0.1):
-        super().__init__()
-        self.attn_head = MultiHeadAttention(d_model, d_feature, n_heads, dropout)
-        self.layer_norm1 = nn.LayerNorm(d_model)
+    def __init__(self, d_model, d_ff, n_heads, d_output, dropout):
+        super(EncoderBlock, self).__init__()
+        self.attn_head = MultiHeadAttention(d_model, n_heads, d_output, dropout)
+        self.layer_norm1 = nn.LayerNorm(d_output)
         self.dropout = nn.Dropout(dropout)
         self.position_wise_feed_forward = nn.Sequential(
-            nn.Linear(d_model, d_ff),
+            nn.Linear(d_output, d_ff),
             nn.ReLU(),
-            nn.Linear(d_ff, d_model),
+            nn.Linear(d_ff, d_output),
         )
-        self.layer_norm2 = nn.LayerNorm(d_model)
+        self.layer_norm2 = nn.LayerNorm(d_output)
 
     def forward(self, x):
         """
         x : (n, l, d_model)
         """
-        att = self.attn_head(x, x, x)  # self attention (n, l, d_model) -> (n, l, d_model)
+        x = self.attn_head(x, x, x)  # self attention (n, l, 60) -> (n, l, 230)
         # Apply normalization and residual connection
-        x = x + self.dropout(self.layer_norm1(att))  # (n, l, d_model) -> (n, l, d_model)
+        x = x + self.dropout(self.layer_norm1(x))  # (n, l, 230) -> (n, l, 230)
         # Apply position-wise feed-forward networks
-        pos = self.position_wise_feed_forward(x)  # (n, l, d_model) -> (n, l, d_ff) -> (n, l, d_model)
+        pos = self.position_wise_feed_forward(x)  # (n, l, 230) -> (n, l, d_ff) -> (n, l, 230)
         # Apply normalization and residual connection
-        x = x + self.dropout(self.layer_norm2(pos))  # (n, l, d_model)
-        return x  # (n, l, d_model)
+        x = x + self.dropout(self.layer_norm2(pos))  # (n, l, 230)
+        return x  # (n, l, 230)

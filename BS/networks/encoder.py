@@ -35,7 +35,7 @@ class _MaxPooling(nn.Module):
         super(_MaxPooling, self).__init__()
 
     def forward(self, x, hidden_size):
-        x, _ = torch.max(x, dim=2)
+        x, _ = torch.max(x, dim=1)
         return x.view(-1, hidden_size)
 
 
@@ -80,9 +80,9 @@ class BiGru(nn.Module):
         self.sentence_len = config.sentence_len  # 120
         self.dropout = config.dropout  # 0.1
         self.input_dim = config.input_dim  #
-        self.out_channels = config.d_model // 2  # hidden dim // 2 = 256 // 2 = 256
+        self.out_channels = config.output_dim // 2  # hidden dim // 2 = 256 // 2 = 256
         self.rnn = nn.GRU(input_size=self.input_dim, hidden_size=self.out_channels, bidirectional=True)
-        self.attn = TransformerEncoder(config)
+        self.attn = SelfAttEncoder(config)
 
     def init_hidden(self):
         if self.config.use_gpu:
@@ -97,37 +97,48 @@ class BiGru(nn.Module):
         :param embedding: word embeddings sentences, (n=batch_size/sen_num, sen_len=120, embedding_size=60)
         """
         embedding = embedding.permute(1, 0, 2)  # (sen_len=120, n, embedding_size=60)
-        lstm_final_all, final_hidden = self.rnn(embedding)  # lstm_out(120, n, 256) stores the final state for all
-        del lstm_final_all
+        final_all, final_hidden = self.rnn(embedding)  # gtu_out(120, n, 256) stores the final state for all
+        del final_all
         final_hidden = final_hidden.view(1, -1, self.config.out_channels)  # (2, sen_num, 128) -> (1, sen_num, 256)
-        # final_hidden = final_hidden.permute(1, 0, 2)  # (1, n, 256) -> (n, 1, 256)
         return final_hidden
 
 
-class TransformerEncoder(nn.Module):
-    def __init__(self, config):
-        super(TransformerEncoder, self).__init__()
+class SelfAttention(nn.Module):
+    def __init__(self, config, input_dim, output_dim):
+        super(SelfAttention, self).__init__()
+        self.config = config
+        self.input_dim = input_dim
+        self.output_dim = output_dim
         self.encoders = nn.ModuleList(
             [
-                EncoderBlock(d_model=config.d_model, d_feature=config.d_model // config.n_heads, n_heads=config.n_heads,
-                             d_ff=config.d_ff, dropout=config.dropout)
+                EncoderBlock(d_model=input_dim, n_heads=config.n_heads,
+                             d_ff=config.d_ff, d_output=output_dim, dropout=config.attn_dropout)
                 for _ in range(config.n_blocks)
             ]
         )
+
+    def forward(self, x):
+        """
+        x : output of last layer, (n=batch_size, l=sen_len, 60)
+        """
+        for encoder in self.encoders:
+            x = encoder(x)
+        return x  # (n, l, 230)
+
+
+class SelfAttEncoder(nn.Module):
+    def __init__(self, config, input_dim, output_dim):
+        super(SelfAttEncoder, self).__init__()
+        self.config = config
+        self.output_dim = output_dim
+        self.attn_encoder = SelfAttention(config, input_dim, output_dim)
         self.pooling = _MaxPooling()
 
     def forward(self, x):
         """
-        x : output of BLstm, (n=batch_size, l=sen_len, 256)
+        x : output of last layer, (n=batch_size, l=sen_len, 60)
         """
-        for encoder in self.encoders:
-            x = encoder(x)
-        # x: (n, l, 256)
+        x = self.attn_encoder(x)  # (n, l, 230)
         # perform max pooling in one sentence
-        x, _ = torch.max(x, dim=1)
-        del _  # save memory
-        return x.unsqueeze(1).permute(1, 0, 2)  # (n, 1, 256)
-
-
-class SoftAttention(nn.Module):
-    pass
+        x = self.pooling(x, self.output_dim)  # (n, l, 230) -> (n, 230)
+        return x  # (n, 230)

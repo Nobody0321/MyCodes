@@ -52,7 +52,7 @@ class Config(object):
         self.optimizer = None
         self.learning_rate = 0.5
         self.weight_decay = 1e-5  # for Adadelta
-        self.dropout = 0.1
+        self.dropout = 0.5
         self.checkpoint_dir = "./checkpoint"
         self.test_result_dir = "./test_result"
         self.save_epoch = 1

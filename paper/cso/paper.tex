@@ -70,8 +70,30 @@ Ridel等人认为一个句袋中至少可以有一个句子实例表述了标注
 然而软注意力机制需要串行的计算句子得分和注意力权重，在时间效率上不尽如人意。
 
 为了解决远程监督中句子特征提取和降噪问题，我们提出了层次的注意力机制，基于自注意力机制，能够快速高效的在句子层面提取特征，并且在句袋层面降低噪声。
-我们使用了一个基于自注意力机制的句子编码器，能够更好的捕获句子中的任意两个单词之间的长期依赖关系。
-
+我们使用了一个基于自注意力机制的句子编码器，能够更好的捕获句子中的任意两个单词之间的长期依赖关系，在不需要自然语言特征标注工具的情况下，得到了一个有更好表示效果的句子特征。
+其次，在句袋层面，我们同样采用了一个基于自注意力机制的句袋编码器，能够更好的在充满噪声数据的句袋中捕获有效信息。在提升
+实验结果表明我们的句子编码器能够比PCNN和BiLSTM模型取得更好的句子编码效果，句袋编码器能够比多实例学习方法有更好的降噪效果。
+\section{相关工作}
+为了解决在有监督的关系抽取研究中标注数据较少的问题，Minz\cite{bib1}等人提出了一种称为远程监督（Distant Supervision）的标注方法。
+该方法利用已有的知识库，启发式地将知识库中现存的三元组与语料对齐，从而自动化地获得大量的的标注数据。
+然而远程监督假设过于绝对，其认为只要一个句子中有两个在知识库中的实体，并且这两个实体在知识库中存在关系\textbg{r}，就认为这个句子表述了关系\textbf{r}，并将其标注为\textbf{r}。
+这个绝对的假设，也为远程监督的标注的数据集带来了海量的噪声。
+为了解决远程监督带来的噪声问题，多实例学习首先被Ridel等人 \cite{bib2}提出，采用了一个更为宽松的假设，同一对实体标注为关系\textbg{r}的所有句子中，至少有一对确实表述了关系\textbg{r}。
+以上的学习方法多依赖于手工特征或者使用外部标注工具标注的特征作为句子特征，严重依赖于标注的准确性，也会导致误差传播问题。
+为了解决在关系抽取时句子特征的提取问题，随着深度学习在其他领域的大获成功，也逐渐被引入了关系抽取领域。Zeng 等人首次提出了使用PCNNs作为特征提取器。
+PCNNs网络将句子从实体对断开成三段，在三段上分别使用最大池化，一定程度上提取了句子的结构信息。BILSTM——ATT使用 BiLSTM模型，更好地在序列上捕获了长期依赖关系。
+此外，为了解决远程监督的错误标签问题，Qinghua使用了句袋间的软注意力机制，提取了句袋中与相关关系最为重要的成分，达到了良好的降噪效果。
+近年来，更多的研究重点放在使用强化学习对数据集的噪声进行建模，更好的拟合非噪声数据。ACL2019提出使用全局的优化方法，使用贝叶斯概率在关系和句袋之间进行概率计算。也获得了不错的关系。
+2017年来，attention机制进入了人们的视线，google提出了multi head self attention机制，能够更好地捕获长距离序列中各单词之间的依赖关系，同时通过并行化的方法，大大减小了运算时间，提升了效率。
+以self attention机制为核心的transformer网络和bert语言模型也在各种下游任务上取得了最好的效果。
+受到GooGL的启发，我们提出了使用self attention模型为基础的句子编码器和句袋编码器。在句子特征选择和句袋模型选择上，我们选择句子级别和句袋级别soft attention，作为特征蒸馏器。更好地应对了数据噪声。
+\section{算法模型}
+本章我们主要介绍层次注意力机制的主要结构。
+如图所示，模型主要由两个模块组成：句子特征提取器和句袋特征提取器。第一部分主要通过self attention机制计算数据中每一个句子的特征，可以将含有实体对的自然文本转变成一个定长为d_hidden的实值向量。
+其次是一个句袋特征提取器，同样使用self attention机制，在句袋内部通过注意力机制的权重，对所有句子的特征向量进行重新分配。达到了较好的降噪效果。
+\subsection{句子表示学习}
+\subsubsection{词编码 位置编码}
+词编码主要任务是高维稀疏的独热词编码转化为稠密低维的向量表示，目前公认的使用预训练好的词向量能够对下游任务有较好的提升，目前最主流的词编码是google提出的word2vec。该方法使用cbow和skipgram方法，在wikipedia上进行训练。
 \section{相关工作}
 
 \subsection{正文}
@@ -183,11 +205,11 @@ Ridel等人认为一个句袋中至少可以有一个句子实例表述了标注
 %----------------------------------------------------------
 
 \begin{thebibliography}{15} % 这里的2是指参考文献总数目，需要根据实际情况进行修改
-    \bibitem{bib1} Mike Mintz, Stevens Bills, Rion Snow, et al Distant supervision for relation extraction without labeled data, \textit{Proc. Joint Conf. 47th Annu. Meeting ACL 4th Int. Joint Conf. Natural Lang. Process. (AFNLP) Assoc. Comput. Linguistics}, Aug. 2009, pp. 1003–1011.
+    \bibitem{bib1} Mike Mintz, Stevens Bills, Rion Snow, et al. Distant supervision for relation extraction without labeled data, \textit{Proc. Joint Conf. 47th Annu. Meeting ACL 4th Int. Joint Conf. Natural Lang. Process. (AFNLP) Assoc. Comput. Linguistics}, Aug. 2009, pp. 1003–1011.
     \bibitem{bib2} S. Riedel, L. Yao, and A. McCallum, Modeling relations and their mentions without labeled text, \textit{Proc. Joint Eur. Conf. Mach. Learn. Knowl. Discovery Databases.} Berlin, Germany: Springer, 2010, pp. 148–163.
-    \bibitem{bib3} Zeng Daojian, Liu Kang, Chen Yubo, et al, Distant Supervision for Relation Extraction via Piecewise Convolutional Neural Networks
-    \bibitem{bib4} Lin Yankai, Shen Shiqi,Liu Zhiyuan, et al, Neural Relation Extraction with Selective 注意力机制 over Instances
-    \bibitem{bib5} Attention Is AL You Need
+    \bibitem{bib3} Zeng Daojian, Liu Kang, Chen Yubo, et al., Distant Supervision for Relation Extraction via Piecewise Convolutional Neural Networks
+    \bibitem{bib4} Lin Yankai, Shen Shiqi,Liu Zhiyuan, et al., Neural Relation Extraction with Selective Attention over Instances
+    \bibitem{bib5} Vaswani，Ashish，Shazeer Noam，Parmar Niki，et al.,Attention Is AL You Need，31st Conference on Neural Information Processing Systems (NIPS 2017), Long Beach, CA, USA.
 \end{thebibliography}
 
 \end{document}

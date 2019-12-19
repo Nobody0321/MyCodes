@@ -65,6 +65,7 @@ class Config(object):
         self.input_dim = self.word_embedding_dim + self.pos_embedding_dim * 2  # input dim
         self.save_iter = 1000
         self.attn_dropout = 0.1
+        self.train_start_epoch = 1
 
     def init_logger(self, log_name):
         if not os.path.exists(self.log_dir):
@@ -203,16 +204,17 @@ class Config(object):
             self.trainModel.cuda()
         if self.optimizer is not None:
             pass
-        elif self.opt_method == "Adagrad" or self.opt_method == "adagrad":
+        elif self.opt_method.lower() == "adagrad":
             self.optimizer = optim.Adagrad(self.trainModel.parameters(), lr=self.learning_rate, lr_decay=self.lr_decay,
                                            weight_decay=self.weight_decay)
-        elif self.opt_method == "Adadelta" or self.opt_method == "adadelta":
+        elif self.opt_method.lower() == "adadelta":
             self.optimizer = optim.Adadelta(self.trainModel.parameters(), lr=self.learning_rate,
                                             weight_decay=self.weight_decay)
-        elif self.opt_method == "Adam" or self.opt_method == "adam":
+        elif self.opt_method.lower() == "adam":
             self.optimizer = optim.Adam(self.trainModel.parameters(), lr=self.learning_rate,
                                         weight_decay=self.weight_decay)
         else:
+            print("optim {} not found, using SGD instead".format(self.opt_method))
             self.optimizer = optim.SGD(self.trainModel.parameters(), lr=self.learning_rate,
                                        weight_decay=self.weight_decay)
         print("Finish initializing")
@@ -289,16 +291,17 @@ class Config(object):
                 print("WARNING: out of memory")
                 if hasattr(torch.cuda, 'empty_cache'):
                     torch.cuda.empty_cache()
+                    print("cleaning empty cache")
                 loss, _output = self.trainModel()  # loss and prediction result
             else:
                 raise e
-        _output = _output.cpu()
+        _output = _output.cpu().numpy().tolist()
         loss.backward()
         self.optimizer.step()
         loss = loss.cpu().detach().numpy()
-        print("prediction: ", _output.tolist())
+        print("prediction: ", _output)
         print("gt label:   ", self.batch_label.tolist())
-        self.logger.info("prediction: " + str(_output.tolist()))
+        self.logger.info("prediction: " + str(_output))
         self.logger.info("gt label: " + str(self.batch_label.tolist()))
         for i, prediction in enumerate(_output):
             if self.batch_label[i] == 0:
@@ -335,9 +338,9 @@ class Config(object):
         best_r = None
         best_epoch = 0
         self.init_logger("train-" + self.model.__name__)
-        for epoch in range(self.max_epoch):
-            print("Epoch " + str(epoch + 1) + " starts...")
-            self.logger.info("Epoch " + str(epoch + 1) + " starts...")
+        for epoch in range(self.train_start_epoch, self.max_epoch):
+            print("Epoch " + str(epoch) + " starts...")
+            self.logger.info("Epoch " + str(epoch) + " starts...")
             self.acc_NA.clear()
             self.acc_not_NA.clear()
             self.acc_total.clear()
@@ -353,33 +356,35 @@ class Config(object):
                 time_str = datetime.datetime.now().isoformat()
                 info_massage = "epoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, " \
                                "total accuracy: %f\r" % (
-                                   epoch + 1, batch_num + 1, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(),
+                                   epoch, batch_num + 1, time_str, loss, self.acc_NA.get(), self.acc_not_NA.get(),
                                    self.acc_total.get())
                 print(info_massage)
                 self.logger.info(info_massage)
                 if (batch_num + 1) % self.save_iter == 0:
-                    print("Saving model at Epoch: {0}, iteration: {1}.".format(epoch + 1, batch_num + 1))
+                    print("Saving model at Epoch: {0}, iteration: {1}.".format(epoch, batch_num + 1))
                     path = os.path.join(self.checkpoint_dir,
-                                        self.model.__name__ + "-{0}_{1}-{2}:{3}".format(epoch + 1, batch_num + 1, loss, self.acc_not_NA.get()))
+                                        self.model.__name__ + "-{0}_{1}-{2}:{3}".format(epoch, batch_num + 1, loss, self.acc_not_NA.get()))
                     torch.save(self.trainModel.state_dict(), path)
-
-            if (epoch + 1) % self.save_epoch == 0:
-                print("Epoch {} has finished".format(epoch + 1))
-                print("Saving model...")
-                self.logger.info("Epoch {} has finished".format(epoch + 1))
-                self.logger.info("Saving model...")
-                path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch + 1))
-                torch.save(self.trainModel.state_dict(), path)
-                print("Have saved model to " + path)
-                self.logger.info("Have saved model to " + path)
-            if (epoch + 1) % self.test_epoch == 0:
+            if epoch % self.test_epoch == 0:
                 self.testModel = self.trainModel
                 auc, pr_x, pr_y = self.test_one_epoch()
+                np.save(os.path.join(self.test_result_dir, self.model.__name__ + str(epoch+1) + "_x.npy"), best_p)
+                np.save(os.path.join(self.test_result_dir, self.model.__name__ + str(epoch+1) + "_y.npy"), best_r)
                 if auc > best_auc:
                     best_auc = auc
                     best_p = pr_x
                     best_r = pr_y
                     best_epoch = epoch
+            if epoch % self.save_epoch == 0:
+                print("Epoch {} has finished".format(epoch))
+                print("Saving model...")
+                self.logger.info("Epoch {} has finished".format(epoch))
+                self.logger.info("Saving model...")
+                path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-{}-auc-{}".format(epoch, auc))
+                torch.save(self.trainModel.state_dict(), path)
+                print("Have saved model to " + path)
+                self.logger.info("Have saved model to " + path)
+
         info_massage = "Finish training\n" + "Best epoch = {0} | auc = {1}\n".format(best_epoch, best_auc) + "Storing best result..."
         print(info_massage)
         self.logger.info(info_massage)
@@ -414,14 +419,14 @@ class Config(object):
         # test_result (epoch_size_of_sen, 53) stores each instance's label and predicted label score
         # sort test_result by predicted score
         test_result = sorted(test_result, key=lambda x: x[1], reverse=True)  # decrease
-        pr_x = []  # fpr
-        pr_y = []  # tpr
+        pr_x = []  # x for pr curve
+        pr_y = []  # y for pr curve
         correct = 0  # tp
         for i, item in enumerate(test_result):
             correct += item[0]  # tp
-            pr_x.append(float(correct) / self.total_recall)  # tp/ =
-            pr_y.append(float(correct) / (i + 1))  # tp/p = tpr
-        auc = sklearn.metrics.auc(x=pr_x, y=pr_y)  # get auc
+            pr_x.append(float(correct) / self.total_recall)  # recall
+            pr_y.append(float(correct) / (i + 1))  # precision
+        auc = sklearn.metrics.auc(x=pr_x, y=pr_y)  # get area under pr curve
         print("auc: ", auc)
         self.logger.info("auc: ", auc)
         return auc, pr_x, pr_y
@@ -431,24 +436,26 @@ class Config(object):
         best_auc = 0.0
         best_p = None
         best_r = None
+        self.init_logger("test-" + self.model.__name__)
         for epoch in self.epoch_range:
-            path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch + 1))
+            path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch))
             if not os.path.exists(path):
                 continue
-            print("Start testing epoch %d" % epoch + 1)
-            self.logger.info("Start testing epoch %d" % epoch + 1)
+            print("Start testing epoch %d" % epoch)
+            self.logger.info("Start testing epoch %d" % epoch)
             self.testModel.load_state_dict(torch.load(path))
             auc, p, r = self.test_one_epoch()
+            self.logger.info("For Epoch {}, auc: {}".format(epoch, auc))
             if auc > best_auc:
                 best_auc = auc
                 best_epoch = epoch
                 best_p = p
                 best_r = r
-            print("Finish testing epoch %d" % epoch + 1)
-            self.logger.info("Finish testing epoch %d" % epoch + 1)
+            print("Finish testing epoch %d" % epoch)
+            self.logger.info("Finish testing epoch %d" % epoch)
 
-        print(("Best epoch = %d | auc = %f" % (best_epoch + 1, best_auc)))
-        self.logger.info("Best epoch = %d | auc = %f" % (best_epoch + 1, best_auc))
+        print(("Best epoch = %d | auc = %f" % (best_epoch, best_auc)))
+        self.logger.info("Best epoch = %d | auc = %f" % (best_epoch, best_auc))
         print("Storing best result...")
         self.logger.info("Storing best result...")
         if not os.path.isdir(self.test_result_dir):

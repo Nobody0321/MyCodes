@@ -171,9 +171,9 @@ class SelfAttSelector(Selector):
         for i in range(len(self.scope) - 1):
             sen_vec_one_bag = x[self.scope[i]: self.scope[i + 1]]  # (bag_size, 230)
             sen_vec_one_bag = sen_vec_one_bag.unsqueeze(0)  # (1, bag_size, 230)
-            final_repre = self.attn(sen_vec_one_bag)  # (1, 230)
+            final_repre = self.attn(sen_vec_one_bag).squeeze()  # (230)
             tower_repre.append(final_repre)
-        stack_repre = torch.stack(tower_repre)
+        stack_repre = torch.stack(tower_repre)  # batch_size 230
         logits = self.get_logits(stack_repre)
         score = F.softmax(logits, 1)
         return list(score.data.cpu().numpy())

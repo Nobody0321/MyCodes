@@ -82,7 +82,7 @@ class EncoderBlock(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.position_wise_feed_forward = nn.Sequential(
             nn.Linear(d_output, d_ff),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
             nn.Linear(d_ff, d_output),
         )
         self.layer_norm2 = nn.LayerNorm(d_output)

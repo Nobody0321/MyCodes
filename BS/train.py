@@ -10,7 +10,7 @@ con.use_gpu = True
 con.data_dir = "./data"
 # con.data_dir = "./mini_dataset-1000"
 con.set_max_epoch(20)
-con.batch_size = 10
+con.batch_size = 8
 con.output_dim = 230
 con.d_ff = 512  # feed forward dim
 con.n_heads = 5  # num of scale product attention heads

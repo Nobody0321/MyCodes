@@ -6,6 +6,8 @@ import torch
 import torch.optim as optim
 import sklearn.metrics
 from tqdm import tqdm
+torch.backends.cudnn.enabled = True
+torch.backends.cudnn.benchmark = True
 
 
 class Accuracy(object):
@@ -291,14 +293,13 @@ class Config(object):
                 print("WARNING: out of memory")
                 if hasattr(torch.cuda, 'empty_cache'):
                     torch.cuda.empty_cache()
-                    print("cleaning empty cache")
+                    print("cleaning cache")
                 loss, _output = self.trainModel()  # loss and prediction result
             else:
                 raise e
         _output = _output.cpu().numpy().tolist()
         loss.backward()
         self.optimizer.step()
-        loss = loss.cpu().detach().numpy()
         print("prediction: ", _output)
         print("gt label:   ", self.batch_label.tolist())
         self.logger.info("prediction: " + str(_output))
@@ -309,7 +310,7 @@ class Config(object):
             else:
                 self.acc_not_NA.add(prediction == self.batch_label[i])
             self.acc_total.add(prediction == self.batch_label[i])
-        return loss
+        return loss.item()
 
     def test_one_step(self):
         self.testModel.selector.scope = self.batch_scope

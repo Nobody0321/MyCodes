@@ -66,7 +66,7 @@
 				 \setcounter{section}{-1}}
 \AtEndDocument{\clearpage}
 
-%%% ╤╗рЕрЁц╪рЁ╫е
+%%% О©╫О©╫О©╫О©╫рЁц╪рЁО©╫О©╫
 \newsavebox{\csologo}
 \sbox{\csologo}{\includegraphics{csologo}}
 \RequirePackage{fancyhdr}
@@ -77,13 +77,13 @@
 \fancyfoot{}
 \fancyfoot[C]{-\ {\thepage}\ -}
 
-%%% ╤╗рЕио╠Йпнй╫╣дндоврЩсц
+%%% О©╫О©╫О©╫О©╫О©╫о╠О©╫О©╫О©╫й╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
 \newcommand{\upcite}[1]{\textsuperscript{\cite{#1}}}
 
-%%% иХжцап╠М╩╥╬Ё╣д╬ЮюК
+%%% О©╫О©╫О©╫О©╫О©╫п╠О©╫О©╫О©╫О©╫О©╫О©╫д╬О©╫О©╫О©╫
 \setlength{\parsep}{0cm}
 
-%%% иХжцм╪╠М╠ЙлБиооб©у╟в
+%%% О©╫О©╫О©╫О©╫м╪О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫б©у╟О©╫
 \setlength{\abovecaptionskip}{5pt plus 5pt minus 0pt}% 
 \setlength{\belowcaptionskip}{5pt plus 5pt minus 0pt}% 
 

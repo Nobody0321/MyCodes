@@ -3,8 +3,8 @@ from networks.selector import *
 from .Model import Model
 
 
-class PCNN_ATT(Model):
+class PCNN_self(Model):
 	def __init__(self, config):
-		super(PCNN_ATT, self).__init__(config)
+		super(PCNN_self, self).__init__(config)
 		self.encoder = PCNN(config)
-		self.selector = SelfSelectiveAttention(config, config.hidden_size * 3)
+		self.selector = SelfAttSelector(config, config.hidden_size * 3, 230)

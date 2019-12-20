@@ -11,16 +11,17 @@ con.data_dir = "./data"
 # con.data_dir = "./mini_dataset-1000"
 con.set_max_epoch(20)
 con.batch_size = 8
+con.hidden_size = 230
 con.output_dim = 230
 con.d_ff = 256  # feed forward dim
 con.n_heads = 5  # num of scale product attention heads
 con.n_blocks = 1  # encoder blocks
 con.set_learning_rate(0.0001)
-con.set_weight_decay(0.0001)
+con.set_weight_decay(0.00001)
 # con.train_start_epoch = 7
 con.save_iter = 4000
 con.opt_method = "Adam"
 con.load_train_data()
 con.load_test_data()
-con.set_train_model(models.self_self)
+con.set_train_model(models.PCNN_self)
 con.train()

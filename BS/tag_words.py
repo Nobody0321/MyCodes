@@ -103,7 +103,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, sen_max_length=120,
     sen_word = np.zeros((sen_num, sen_max_length), dtype=np.int64)  # convert each word in sentence to word id
     sen_pos1 = np.zeros((sen_num, sen_max_length), dtype=np.int64)
     sen_pos2 = np.zeros((sen_num, sen_max_length), dtype=np.int64)
-    # sen_mask = np.zeros((sen_num, sen_max_length, 3), dtype = np.float32)
+    sen_mask = np.zeros((sen_num, sen_max_length, 3), dtype = np.float32)
     senid_2_relationid = np.zeros(sen_num, dtype=np.int64)
     sen_len = np.zeros(sen_num, dtype=np.int64)  # 保存每个句子的长度
     bag_label = []
@@ -152,15 +152,15 @@ def init(file_name, word_vec_file_name, rel2id_file_name, sen_max_length=120,
             # sen_pos1, sen_pos2
             sen_pos1[i][j] = j - pos1 + sen_max_length
             sen_pos2[i][j] = j - pos2 + sen_max_length
-        # # sen_mask
-        # if j >= sen_len[i]:
-        # 	sen_mask[i][j] = [0, 0, 0]
-        # elif j - pos_min <= 0:
-        # 	sen_mask[i][j] = [100, 0, 0]
-        # elif j - pos_max <= 0:
-        # 	sen_mask[i][j] = [0, 100, 0]
-        # else:
-        # 	sen_mask[i][j] = [0, 0, 100]
+        # sen_mask
+        if j >= sen_len[i]:
+            sen_mask[i][j] = [0, 0, 0]
+        elif j - pos_min <= 0:
+            sen_mask[i][j] = [100, 0, 0]
+        elif j - pos_max <= 0:
+            sen_mask[i][j] = [0, 100, 0]
+        else:
+            sen_mask[i][j] = [0, 0, 100]
         # bag_scope
         if is_training:
             tup = (data["head"]["id"], data["tail"]["id"], data["relation"])
@@ -222,7 +222,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, sen_max_length=120,
     np.save(os.path.join(out_path, name_prefix + "_word.npy"), sen_word)
     np.save(os.path.join(out_path, name_prefix + "_pos1.npy"), sen_pos1)
     np.save(os.path.join(out_path, name_prefix + "_pos2.npy"), sen_pos2)
-    # np.save(os.path.join(out_path, name_prefix + "_mask.npy"), sen_mask)
+    np.save(os.path.join(out_path, name_prefix + "_mask.npy"), sen_mask)
     np.save(os.path.join(out_path, name_prefix + "_bag_label.npy"), bag_label)
     np.save(os.path.join(out_path, name_prefix + "_bag_scope.npy"), bag_scope)
     np.save(os.path.join(out_path, name_prefix + "_ins_label.npy"), ins_label)

@@ -45,7 +45,7 @@ class Selector(nn.Module):
         raise NotImplementedError
 
 
-class SoftAttention(Selector):
+class SelfSelectiveAttention(Selector):
     def _attention_train_logit(self, bag_vec):
         """
         calculate attention logit

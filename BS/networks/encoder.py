@@ -1,5 +1,7 @@
 from networks.embedding import *
 from .attention import *
+import torch.nn.functional as F
+import torch.nn as nn
 
 
 class _CNN(nn.Module):
@@ -70,6 +72,33 @@ class CNN(nn.Module):
         return self.activation(x)
 
 
+class soft_attention(nn.Module):
+    def __init__(self, config):
+        super(soft_attention, self).__init__()
+        self.config = config
+        self.activation = torch.tanh
+        if config.use_gpu:
+            self.linear = torch.rand(1, 230).cuda()
+        else:
+            self.linear = torch.rand(1, 230)
+        nn.init.xavier_uniform_(self.linear.data)
+
+    def forward(self, x):
+        """
+
+        :param x: (n, l, d)
+        :return:
+        """
+        ret = []
+        for each in x:
+            M = torch.matmul(self.linear, self.activation(each.transpose(0, 1)))
+            attention_weights = F.softmax(M, dim=1)  #
+            each = torch.matmul(attention_weights, each)
+            ret.append(self.activation(each.squeeze(0)))
+        return torch.stack(ret)
+
+
+
 # in pyTorch BiGru takes a 3-dim tensor as input, where the first dim represents the sentence_len,
 # the second dim represents the batch_size,, and the third dim represents the word embedding_size
 class BiGru(nn.Module):
@@ -132,7 +161,7 @@ class SelfAttEncoder(nn.Module):
         self.config = config
         self.output_dim = output_dim
         self.attn_encoder = SelfAttention(config, input_dim, output_dim)
-        self.pooling = _MaxPooling()
+        self.pooling = soft_attention(config)
 
     def forward(self, x):
         """
@@ -140,5 +169,5 @@ class SelfAttEncoder(nn.Module):
         """
         x = self.attn_encoder(x)  # (n, l, 230)
         # perform max pooling in one sentence
-        x = self.pooling(x, self.output_dim)  # (n, l, 230) -> (n, 230)
+        x = self.pooling(x)  # (n, l, 230) -> (n, 230)
         return x  # (n, 230)

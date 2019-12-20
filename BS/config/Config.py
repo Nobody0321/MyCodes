@@ -68,6 +68,10 @@ class Config(object):
         self.save_iter = 1000
         self.attn_dropout = 0.1
         self.train_start_epoch = 1
+        self.batch_size = 50
+        self.d_ff = 1024  # feed forward dim
+        self.n_heads = 5  # num of scale product attention heads
+        self.n_blocks = 1  # encoder blocks
 
     def init_logger(self, log_name):
         if not os.path.exists(self.log_dir):

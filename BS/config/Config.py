@@ -292,6 +292,15 @@ class Config(object):
         _output = _output.cpu().numpy().tolist()
         loss.backward()
         self.optimizer.step()
+        # free memory
+        del self.trainModel.embedding.word
+        del self.trainModel.embedding.pos0
+        del self.trainModel.embedding.pos1
+        del self.trainModel.embedding.pos2
+        # del self.trainModel.encoder.mask
+        del self.trainModel.selector.attention_query
+        del self.trainModel.selector.label
+        del self.trainModel.classifier.label
         print("prediction: ", _output)
         print("gt label:   ", self.batch_label.tolist())
         self.logger.info("prediction: " + str(_output))
@@ -313,6 +322,12 @@ class Config(object):
         # self.testModel.encoder.mask = self.to_var(self.batch_mask)
         # no label in test, we do not need labels to calculate loss
         score = self.testModel.test()  # only returns classification result, no need for loss
+        # free memory
+        del self.testModel.embedding.word
+        del self.testModel.embedding.pos0
+        del self.testModel.embedding.pos1
+        del self.testModel.embedding.pos2
+        # del self.testModel.encoder.mask
         return score
 
     def train(self):
@@ -346,25 +361,26 @@ class Config(object):
                     path = os.path.join(self.checkpoint_dir,
                                         self.model.__name__ + "-{0}_{1}-{2}:{3}".format(epoch, batch_num + 1, loss, self.acc_not_NA.get()))
                     torch.save(self.trainModel.state_dict(), path)
-            if epoch % self.test_epoch == 0:
-                self.testModel = self.trainModel
-                auc, pr_x, pr_y = self.test_one_epoch()
-                np.save(os.path.join(self.test_result_dir, self.model.__name__ + str(epoch+1) + "_x.npy"), best_p)
-                np.save(os.path.join(self.test_result_dir, self.model.__name__ + str(epoch+1) + "_y.npy"), best_r)
-                if auc > best_auc:
-                    best_auc = auc
-                    best_p = pr_x
-                    best_r = pr_y
-                    best_epoch = epoch
-            if epoch % self.save_epoch == 0:
-                print("Epoch {} has finished".format(epoch))
-                print("Saving model...")
-                self.logger.info("Epoch {} has finished".format(epoch))
-                self.logger.info("Saving model...")
-                path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-{}-auc-{}".format(epoch, auc))
-                torch.save(self.trainModel.state_dict(), path)
-                print("Have saved model to " + path)
-                self.logger.info("Have saved model to " + path)
+
+            # if epoch % self.test_epoch == 0:
+            self.testModel = self.trainModel
+            auc, pr_x, pr_y = self.test_one_epoch()
+            np.save(os.path.join(self.test_result_dir, self.model.__name__ + str(epoch) + "_x.npy"), pr_x)
+            np.save(os.path.join(self.test_result_dir, self.model.__name__ + str(epoch) + "_y.npy"), pr_y)
+            if auc > best_auc:
+                best_auc = auc
+                best_p = pr_x
+                best_r = pr_y
+                best_epoch = epoch
+        # if epoch % self.save_epoch == 0:
+            print("Epoch {} has finished, auc:{}, best_auc:{}".format(epoch, auc, best_auc))
+            print("Saving model...")
+            self.logger.info("Epoch {} has finished, auc:{}, best_auc:{}".format(epoch, auc, best_auc))
+            self.logger.info("Saving model...")
+            path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-{}-auc-{}".format(epoch, auc))
+            torch.save(self.trainModel.state_dict(), path)
+            print("Have saved model to " + path)
+            self.logger.info("Have saved model to " + path)
 
         info_massage = "Finish training\n" + "Best epoch = {0} | auc = {1}\n".format(best_epoch, best_auc) + "Storing best result..."
         print(info_massage)
@@ -438,7 +454,7 @@ class Config(object):
         print(("Best epoch = %d | auc = %f" % (best_epoch, best_auc)))
         self.logger.info("Best epoch = %d | auc = %f" % (best_epoch, best_auc))
         print("Storing best result...")
-        self.logger.info("Storing best result...")
+        self.logger.info("Storing the best result...")
         if not os.path.isdir(self.test_result_dir):
             os.mkdir(self.test_result_dir)
         np.save(os.path.join(self.test_result_dir, self.model.__name__ + "_x.npy"), best_p)

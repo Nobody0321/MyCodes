@@ -12,8 +12,6 @@ model = {
     "self_self": models.self_self
 }
 con = config.Config()
-con.set_drop_prob(0.5)
-# con.set_pretrain_model("checkpoint/self_self-10")
 con.use_gpu = True
 con.load_test_data()
 con.set_test_model(model[args.model_name])

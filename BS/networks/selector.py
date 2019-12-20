@@ -166,13 +166,15 @@ class Average(Selector):
         return list(score.data.cpu().numpy())
 
 
-class SelfAttSelector(Selector):
-    def __init__(self, config, input_dim, output_dim):
-        super(SelfAttSelector, self).__init__(config, output_dim)
+class SelfAttSelector(nn.Module):
+    def __init__(self, config, input_dim):
+        super(SelfAttSelector, self).__init__()
         self.config = config
         self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.attn = attn(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
+        self.output_dim = input_dim
+        self.dropout = nn.Dropout(self.config.dropout)
+        self.attn = attn(config=config, input_dim=self.input_dim)
+        self.linear = nn.Linear(self.output_dim, self.config.num_classes)
 
     def forward(self, x):
         """
@@ -184,11 +186,11 @@ class SelfAttSelector(Selector):
         for i in range(len(self.scope) - 1):
             sen_vec_one_bag = x[self.scope[i]: self.scope[i + 1]]  # (bag_size, 230)
             sen_vec_one_bag = sen_vec_one_bag.unsqueeze(0)  # (1, bag_size, 230)
-            final_repre = self.attn(sen_vec_one_bag).squeeze()  # (1, bag_size, 230) -> (230)
+            final_repre = self.attn(sen_vec_one_bag).squeeze()  # (1, bag_size, 230) -> (1, 230) -> (230)
             tower_repre.append(final_repre)
-        stack_repre = torch.stack(tower_repre)
+        stack_repre = torch.stack(tower_repre)  # (batch_size, 230)
         stack_repre = self.dropout(stack_repre)
-        logits = self.get_logits(stack_repre)
+        logits = self.linear(stack_repre)  # (batch_size, 230) * (230, 53) -> (batch_size, 53)
         return logits
 
     def test(self, x):
@@ -199,6 +201,6 @@ class SelfAttSelector(Selector):
             final_repre = self.attn(sen_vec_one_bag).squeeze()  # (230)
             tower_repre.append(final_repre)
         stack_repre = torch.stack(tower_repre)  # batch_size 230
-        logits = self.get_logits(stack_repre)
+        logits = self.linear(stack_repre)
         score = F.softmax(logits, 1)
         return list(score.data.cpu().numpy())

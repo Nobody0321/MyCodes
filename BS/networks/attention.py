@@ -78,23 +78,19 @@ class EncoderBlock(nn.Module):
     def __init__(self, d_model, d_ff, n_heads, d_output, dropout):
         super(EncoderBlock, self).__init__()
         self.attn_head = MultiHeadAttention(d_model, n_heads, d_output, dropout)
-        self.layer_norm1 = nn.LayerNorm(d_output)
+        self.layer_norm1 = nn.LayerNorm(d_output, eps=1e-6)
         self.dropout = nn.Dropout(dropout)
         self.position_wise_feed_forward = nn.Sequential(
             nn.Linear(d_output, d_ff),
             nn.ReLU(inplace=True),
             nn.Linear(d_ff, d_output),
         )
-        self.layer_norm2 = nn.LayerNorm(d_output)
+        self.layer_norm2 = nn.LayerNorm(d_output, eps=1e-6)
 
     def forward(self, x):
         """
         input_x : (n, l, d_model)
         """
-        # batchs = math.ceil(float(input_x.size(0))/30)
-        # ret = None
-        # for batch in range(batchs):
-        #     x = input_x[batch: batch + 30]
         x = self.attn_head(x, x, x)  # self attention (n, l, 60) -> (n, l, 230)
         # Apply normalization and residual connection
         x = x + self.dropout(self.layer_norm1(x))  # (n, l, 230) -> (n, l, 230)
@@ -102,8 +98,4 @@ class EncoderBlock(nn.Module):
         pos = self.position_wise_feed_forward(x)  # (n, l, 230) -> (n, l, d_ff) -> (n, l, 230)
         # Apply normalization and residual connection
         x = x + self.dropout(self.layer_norm2(pos))  # (n, l, 230)
-        # if ret is None:
-        #     ret = x
-        # else:
-        #     ret = torch.cat((ret, x), dim=0)
         return x  # (n, l, 230)

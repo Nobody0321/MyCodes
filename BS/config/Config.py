@@ -38,9 +38,9 @@ class Config(object):
         self.log_dir = "./logs"
         self.use_bag = True
         self.use_gpu = True
-        self.is_training = True
+        self.use_attn = True
         self.max_sen_length = 120  # max sentnece lem
-        self.pos_num = 2 * self.max_sen_length  # num of positions = 240
+        self.relative_pos_num = 2 * self.max_sen_length  # num of positions = 240
         self.num_classes = 53  # num of relations
         self.hidden_dim = 230  # output dim encoder
         self.word_embedding_dim = 50  # word embedding dim
@@ -49,7 +49,7 @@ class Config(object):
         self.opt_method = "SGD"
         self.optimizer = None
         self.learning_rate = 0.5
-        self.weight_decay = 1e-5  # for Adadelta
+        self.weight_decay = 1e-5  # for adam family
         self.dropout = 0.5
         self.checkpoint_dir = "./checkpoint"
         self.test_result_dir = "./test_result"
@@ -58,11 +58,9 @@ class Config(object):
         self.pretrain_model = None
         self.trainModel = None
         self.testModel = None
-        self.batch_size = 160
-        self.sentence_len = 120
         self.window_size = 3
         self.epoch_range = None
-        self.input_dim = self.word_embedding_dim + self.pos_embedding_dim * 2  # input dim
+        self.input_dim = self.word_embedding_dim + self.pos_embedding_dim * 3  # input dim
         self.save_iter = 1000
         self.attn_dropout = 0.1
         self.train_start_epoch = 1
@@ -88,7 +86,7 @@ class Config(object):
 
     def set_max_length(self, max_length):
         self.max_sen_length = max_length
-        self.pos_num = 2 * self.max_sen_length
+        self.relative_pos_num = 2 * self.max_sen_length
 
     def set_num_classes(self, num_classes):
         self.num_classes = num_classes
@@ -135,9 +133,6 @@ class Config(object):
     def set_pretrain_model(self, pretrain_model):
         self.pretrain_model = pretrain_model
 
-    def set_is_training(self, is_training):
-        self.is_training = is_training
-
     def set_use_bag(self, use_bag):
         self.use_bag = use_bag
 
@@ -160,6 +155,7 @@ class Config(object):
         print("Reading training data...")
         self.data_word_vec = np.load(os.path.join(self.data_dir, "vec.npy"))  # word vec mapping
         self.data_train_word = np.load(os.path.join(self.data_dir, "train_word.npy"))  # one hot for each word
+        self.data_train_pos0 = np.load(os.path.join(self.data_dir, "train_pos0.npy"))
         self.data_train_pos1 = np.load(os.path.join(self.data_dir, "train_pos1.npy"))
         self.data_train_pos2 = np.load(os.path.join(self.data_dir, "train_pos2.npy"))
         # self.data_train_mask = np.load(os.path.join(self.data_path, "train_mask.npy"))
@@ -181,6 +177,7 @@ class Config(object):
         print("Reading testing data...")
         self.data_word_vec = np.load(os.path.join(self.data_dir, "vec.npy"))  # word id - vec mapping
         self.data_test_word = np.load(os.path.join(self.data_dir, "test_word.npy"))  # word idx
+        self.data_test_pos0 = np.load(os.path.join(self.data_dir, "test_pos0.npy"))  #
         self.data_test_pos1 = np.load(os.path.join(self.data_dir, "test_pos1.npy"))  #
         self.data_test_pos2 = np.load(os.path.join(self.data_dir, "test_pos2.npy"))
         # self.data_test_mask = np.load(os.path.join(self.data_path, "test_mask.npy"))
@@ -248,6 +245,7 @@ class Config(object):
             index += list(range(num[0], num[1] + 1))
             bag_scope.append(bag_scope[len(bag_scope) - 1] + (num[1] - num[0]) + 1)
         self.word_embedding_in_batch = self.data_train_word[index, :]
+        self.postition_embedding0_in_batch = self.data_train_pos0[index, :]
         self.postition_embedding1_in_batch = self.data_train_pos1[index, :]
         self.postition_embedding2_in_batch = self.data_train_pos2[index, :]
         # self.batch_mask = self.data_train_mask[index, :]
@@ -272,6 +270,7 @@ class Config(object):
             index = index + list(range(num[0], num[1] + 1))
             scope.append(scope[len(scope) - 1] + num[1] - num[0] + 1)
         self.word_embedding_in_batch = self.data_test_word[index, :]
+        self.postition_embedding0_in_batch = self.data_test_pos0[index, :]
         self.postition_embedding1_in_batch = self.data_test_pos1[index, :]
         self.postition_embedding2_in_batch = self.data_test_pos2[index, :]
         # self.batch_mask = self.data_test_mask[index, :]
@@ -281,6 +280,7 @@ class Config(object):
         self.trainModel.selector.scope = self.batch_scope
         # assign batch word2vec to embedding.word
         self.trainModel.embedding.word = self.to_tensor(self.word_embedding_in_batch)
+        self.trainModel.embedding.pos0 = self.to_tensor(self.postition_embedding0_in_batch)
         self.trainModel.embedding.pos1 = self.to_tensor(self.postition_embedding1_in_batch)
         self.trainModel.embedding.pos2 = self.to_tensor(self.postition_embedding2_in_batch)
         # self.trainModel.encoder.mask = self.to_var(self.batch_mask)
@@ -307,6 +307,7 @@ class Config(object):
     def test_one_step(self):
         self.testModel.selector.scope = self.batch_scope
         self.testModel.embedding.word = self.to_tensor(self.word_embedding_in_batch)
+        self.testModel.embedding.pos0 = self.to_tensor(self.postition_embedding0_in_batch)
         self.testModel.embedding.pos1 = self.to_tensor(self.postition_embedding1_in_batch)
         self.testModel.embedding.pos2 = self.to_tensor(self.postition_embedding2_in_batch)
         # self.testModel.encoder.mask = self.to_var(self.batch_mask)

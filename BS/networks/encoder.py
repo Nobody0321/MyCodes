@@ -27,7 +27,7 @@ class _PiecewisePooling(nn.Module):
 
     def forward(self, x, mask, hidden_size):
         mask = torch.unsqueeze(mask, 1)
-        x, _ = torch.max(x, dim=2)
+        x, _ = torch.max(mask + x, dim=2)
         x = x - 100
         return x.view(-1, hidden_size * 3)
 
@@ -77,11 +77,8 @@ class soft_attention(nn.Module):
         super(soft_attention, self).__init__()
         self.config = config
         self.activation = torch.tanh
-        if config.use_gpu:
-            self.linear = torch.rand(1, 230).cuda()
-        else:
-            self.linear = torch.rand(1, 230)
-        nn.init.xavier_uniform_(self.linear.data)
+        self.linear = torch.rand(1, config.hidden_dim).cuda()
+        # nn.init.xavier_uniform_(self.linear.data)
 
     def forward(self, x):
         """
@@ -156,12 +153,13 @@ class SelfAttention(nn.Module):
 
 
 class SelfAttEncoder(nn.Module):
-    def __init__(self, config, input_dim, output_dim):
+    def __init__(self, config, input_dim, output_dim=None):
         super(SelfAttEncoder, self).__init__()
         self.config = config
-        self.output_dim = output_dim
-        self.attn_encoder = SelfAttention(config, input_dim, output_dim)
-        self.pooling = soft_attention(config)
+        self.input_dim = input_dim
+        self.output_dim = input_dim if output_dim is None else output_dim
+        self.attn_encoder = SelfAttention(config, self.input_dim, self.output_dim)
+        # self.pooling = (config)
 
     def forward(self, x):
         """
@@ -169,5 +167,5 @@ class SelfAttEncoder(nn.Module):
         """
         x = self.attn_encoder(x)  # (n, l, 230)
         # perform max pooling in one sentence
-        x = self.pooling(x)  # (n, l, 230) -> (n, 230)
+        x = torch.max(x, dim=1)[0]  # (n, l, 230) -> (n, 230)
         return x  # (n, 230)

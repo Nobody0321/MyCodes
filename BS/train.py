@@ -4,7 +4,6 @@ import os
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 con = Config()
-con.set_pretrain_model("checkpoint/self_self-10-auc-0.20328220590112753")
 con.use_gpu = True
 con.data_dir = "./data"
 con.set_max_epoch(20)

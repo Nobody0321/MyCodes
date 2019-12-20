@@ -6,8 +6,6 @@ import torch
 import torch.optim as optim
 import sklearn.metrics
 from tqdm import tqdm
-torch.backends.cudnn.enabled = True
-torch.backends.cudnn.benchmark = True
 
 
 class Accuracy(object):
@@ -290,17 +288,7 @@ class Config(object):
         self.trainModel.selector.label = self.to_tensor(self.batch_label)
         self.trainModel.classifier.label = self.to_tensor(self.batch_label)
         self.optimizer.zero_grad()  # clear gradient from last step
-        try:
-            loss, _output = self.trainModel()  # loss and prediction result
-        except RuntimeError as e:
-            if "out of memory" in str(e):
-                print("WARNING: out of memory")
-                if hasattr(torch.cuda, 'empty_cache'):
-                    torch.cuda.empty_cache()
-                    print("cleaning cache")
-                loss, _output = self.trainModel()  # loss and prediction result
-            else:
-                raise e
+        loss, _output = self.trainModel()  # loss and prediction result
         _output = _output.cpu().numpy().tolist()
         loss.backward()
         self.optimizer.step()
@@ -323,16 +311,7 @@ class Config(object):
         self.testModel.embedding.pos2 = self.to_tensor(self.postition_embedding2_in_batch)
         # self.testModel.encoder.mask = self.to_var(self.batch_mask)
         # no label in test, we do not need labels to calculate loss
-        try:
-            score = self.testModel.test()  # only returns classification result, no need for loss
-        except RuntimeError as e:
-            if "out of memory" in str(e):
-                print("WARNING: out of memory")
-                if hasattr(torch.cuda, 'empty_cache'):
-                    torch.cuda.empty_cache()
-                    score = self.testModel.test()  # only returns classification result, no need for loss
-            else:
-                raise e
+        score = self.testModel.test()  # only returns classification result, no need for loss
         return score
 
     def train(self):
@@ -349,15 +328,11 @@ class Config(object):
             self.acc_NA.clear()
             self.acc_not_NA.clear()
             self.acc_total.clear()
-            # shuffle bag
+            # shuffle each batch
             np.random.shuffle(self.data_train_order)  # shuffle the bags labels" idx
             for batch_num in range(self.train_batches_num):
                 self.get_train_batch(batch_num)
                 loss = self.train_one_step()
-                # if np.isnan(loss):
-                #     np.save("./embedding.npy", self.word_embedding_in_batch)
-                #     np.save("./scope", np.array(self.batch_scope))
-                #     return
                 time_str = datetime.datetime.now().isoformat()
                 info_massage = "epoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, " \
                                "total accuracy: %f\r" % (

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .encoder import SelfAttEncoder
+from .encoder import SelfAttEncoder as attn
 
 
 class Selector(nn.Module):
@@ -117,6 +117,31 @@ class SelfSelectiveAttention(Selector):
         return list(stack_output.data.cpu().numpy())
 
 
+class One(Selector):
+    def forward(self, x):
+        tower_logits = []
+        for i in range(len(self.scope) - 1):
+            sen_matrix = x[self.scope[i]: self.scope[i + 1]]
+            sen_matrix = self.dropout(sen_matrix)
+            logits = self.get_logits(sen_matrix)
+            score = F.softmax(logits, 1)
+            _, k = torch.max(score, dim=0)
+            k = k[self.label[i]]
+            tower_logits.append(logits[k])
+        return torch.cat(tower_logits, 0)
+
+    def test(self, x):
+        tower_score = []
+        for i in range(len(self.scope) - 1):
+            sen_matrix = x[self.scope[i]: self.scope[i + 1]]
+            logits = self.get_logits(sen_matrix)
+            score = F.softmax(logits, 1)
+            score, _ = torch.max(score, 0)
+            tower_score.append(score)
+        tower_score = torch.stack(tower_score)
+        return list(tower_score.data.cpu().numpy())
+
+
 class Average(Selector):
     def forward(self, x):
         tower_repre = []
@@ -147,7 +172,7 @@ class SelfAttSelector(Selector):
         self.config = config
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.attn = SelfAttEncoder(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
+        self.attn = attn(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
 
     def forward(self, x):
         """

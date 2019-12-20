@@ -6,5 +6,5 @@ from .Model import Model
 class LayerAttention(Model):
     def __init__(self, config):
         super(LayerAttention, self).__init__(config)
-        self.encoder = TransformerEncoder(config, input_dim=config.input_dim, output_dim=config.output_dim)
-        self.selector = SoftAttention(config, config.output_dim)
+        self.encoder = SelfAttEncoder(config, input_dim=config.input_dim, output_dim=config.hidden_dim)
+        self.selector = SelfSelectiveAttention(config, config.hidden_dim)

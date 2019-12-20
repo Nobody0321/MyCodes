@@ -17,5 +17,5 @@ con.save_iter = 3000
 con.load_train_data()
 con.load_test_data()
 # con.set_pretrain_model("")
-con.set_train_model(models.self_self)
+con.set_train_model(models.SelfMaxSelfSoft)
 con.train()

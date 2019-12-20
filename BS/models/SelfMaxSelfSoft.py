@@ -1,13 +1,13 @@
 from networks.encoder import SelfAttEncoder
-from networks.selector import SelfAttMaxSelector
+from networks.selector import SelfSoftAttSelector
 from .Model import Model
 
 
-class self_self(Model):
+class SelfMaxSelfSoft(Model):
     """
     sentence encoder: selfAttention, bag encoder soft attention, superbag encoder none
     """
     def __init__(self, config):
-        super(self_self, self).__init__(config)
+        super(SelfMaxSelfSoft, self).__init__(config)
         self.encoder = SelfAttEncoder(config, input_dim=config.input_dim, output_dim=config.hidden_dim)
-        self.selector = SelfAttMaxSelector(config, input_dim=config.hidden_dim)
+        self.selector = SelfSoftAttSelector(config, input_dim=config.hidden_dim)

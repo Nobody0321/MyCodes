@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .encoder import SelfAttEncoder as attn
+from .encoder import SelfAttention as attn
 
 
 class Selector(nn.Module):
@@ -166,9 +166,14 @@ class Average(Selector):
         return list(score.data.cpu().numpy())
 
 
-class SelfAttSelector(nn.Module):
+# class SoftAttention(nn.Module):
+#     def __init__(self):
+#         super(SoftAttention, self).__init__()
+#         self.config =
+
+class SelfAttMaxSelector(nn.Module):
     def __init__(self, config, input_dim):
-        super(SelfAttSelector, self).__init__()
+        super(SelfAttMaxSelector, self).__init__()
         self.config = config
         self.input_dim = input_dim
         self.output_dim = input_dim
@@ -204,3 +209,44 @@ class SelfAttSelector(nn.Module):
         logits = self.linear(stack_repre)
         score = F.softmax(logits, 1)
         return list(score.data.cpu().numpy())
+
+
+class SelfSoftAttSelector(nn.Module):
+    def __init__(self, config, input_dim):
+        super(SelfSoftAttSelector, self).__init__()
+        self.config = config
+        self.input_dim = input_dim
+        self.output_dim = input_dim
+        self.dropout = nn.Dropout(self.config.dropout)
+        self.self_attn = attn(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
+        self.soft_attn = SelfSelectiveAttention(self.config, self.config.hidden_dim)
+        self.linear = nn.Linear(self.output_dim, self.config.num_classes)
+
+    def forward(self, x):
+        """
+
+        :param x: output of sentence encoder, (n, 230)
+        :return:
+        """
+        tower_repre = []
+        for i in range(len(self.scope) - 1):
+            sen_vec_one_bag = x[self.scope[i]: self.scope[i + 1]]  # (bag_size, 230)
+            sen_vec_one_bag = sen_vec_one_bag.unsqueeze(0)  # (1, bag_size, 230)
+            final_repre = self.self_attn(sen_vec_one_bag).squeeze()  # (1, bag_size, 230) -> (bag_size, 230)
+            tower_repre.append(final_repre)
+        stack_repre = torch.stack(tower_repre)  # (n, 230)
+        stack_repre = self.dropout(stack_repre)
+        logits = self.soft_attn(stack_repre)  # (n, 53) -> (batch_size, 53)
+        return logits
+
+    def test(self, x):
+        tower_repre = []
+        for i in range(len(self.scope) - 1):
+            sen_vec_one_bag = x[self.scope[i]: self.scope[i + 1]]  # (bag_size, 230)
+            sen_vec_one_bag = sen_vec_one_bag.unsqueeze(0)  # (1, bag_size, 230)
+            final_repre = self.self_attn(sen_vec_one_bag).squeeze()  # (1, bag_size, 230) -> (bag_size, 230)
+            tower_repre.append(final_repre)
+        stack_repre = torch.stack(tower_repre)  # (batch_size, 230)
+        stack_repre = self.dropout(stack_repre)
+        score = self.soft_attn.test(stack_repre)
+        return score

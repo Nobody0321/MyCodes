@@ -19,9 +19,13 @@ def main():
         f1 = (2 * x * y / (x + y + 1e-20)).max()
         auc = sklearn.metrics.auc(x=x, y=y)
         plt.plot(x, y, lw=2, label=model)
-        print(model + " : " + "auc = " + str(auc) + " | " + "max F1 = " + str(
-            f1) + "    P@100: {} | P@200: {} | P@300: {} | Mean: {}".format(y[100], y[200], y[300],
-                                                                            (y[100] + y[200] + y[300]) / 3))
+        print(model + " : " + "auc = " + str(auc) + " | " + "max F1 = " + str(f1) +
+              "    P@100: {0} | P@200: {1} | P@300: {2} | Mean: {3} | "
+              "P@R0.1: {4} | P@R0.2: {5} | P@R0.3: {6} | P@R0.4: {7})".format(
+                  y[100], y[200], y[300], (y[100] + y[200] + y[300]) / 3,
+                  y[int(len(y)*0.1)], y[int(len(y)*0.2)], y[int(len(y)*0.3)], y[int(len(y)*0.4)]
+                )
+              )
 
     plt.xlabel("Recall")
     plt.ylabel("Precision")

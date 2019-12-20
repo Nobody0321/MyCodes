@@ -361,6 +361,7 @@ class Config(object):
                     path = os.path.join(self.checkpoint_dir,
                                         self.model.__name__ + "-{0}_{1}-{2}:{3}".format(epoch, batch_num + 1, loss, self.acc_not_NA.get()))
                     torch.save(self.trainModel.state_dict(), path)
+                    # one epoch is over
 
             # if epoch % self.test_epoch == 0:
             self.testModel = self.trainModel
@@ -373,15 +374,16 @@ class Config(object):
                 best_r = pr_y
                 best_epoch = epoch
         # if epoch % self.save_epoch == 0:
-            print("Epoch {} has finished, auc:{}, best_auc:{}".format(epoch, auc, best_auc))
+            print("Epoch {} has finished, auc:{}. best_auc:{}".format(epoch, auc, best_auc))
             print("Saving model...")
             self.logger.info("Epoch {} has finished, auc:{}, best_auc:{}".format(epoch, auc, best_auc))
             self.logger.info("Saving model...")
             path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-{}-auc-{}".format(epoch, auc))
-            torch.save(self.trainModel.state_dict(), path)
+            torch.save(self.testModel.state_dict(), path)
             print("Have saved model to " + path)
             self.logger.info("Have saved model to " + path)
 
+        # all epochs end
         info_massage = "Finish training\n" + "Best epoch = {0} | auc = {1}\n".format(best_epoch, best_auc) + "Storing best result..."
         print(info_massage)
         self.logger.info(info_massage)

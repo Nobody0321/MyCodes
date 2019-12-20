@@ -107,7 +107,7 @@ class BiGru(nn.Module):
         self.config = config
         self.embedding = Embedding(config)
         self.sentence_len = config.sentence_len  # 120
-        self.dropout = config.dropout  # 0.1
+        self.dropout = config.attn_dropout  # 0.1
         self.input_dim = config.input_dim  #
         self.out_channels = config.output_dim // 2  # hidden dim // 2 = 256 // 2 = 256
         self.rnn = nn.GRU(input_size=self.input_dim, hidden_size=self.out_channels, bidirectional=True)

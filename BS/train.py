@@ -10,8 +10,8 @@ con.set_max_epoch(20)
 # con.opt_method = "SGD"
 # con.set_learning_rate(0.01)
 con.set_opt_method("adam")
-con.set_learning_rate(0.001)
-con.set_weight_decay(0.0001)
+con.set_learning_rate(0.0001)
+# con.set_weight_decay(0.000001)
 # con.train_start_epoch = 11
 con.save_iter = 3000
 con.load_train_data()

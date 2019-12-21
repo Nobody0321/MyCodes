@@ -34,6 +34,14 @@ class AttentionHead(nn.Module):
         self.key_transform = nn.Linear(d_model, d_feature)
         self.value_transform = nn.Linear(d_model, d_feature)
 
+    def init(self):
+        nn.init.xavier_normal_(self.query_transform.weight.data)
+        nn.init.xavier_normal_(self.query_transform.bias.data)
+        nn.init.xavier_normal_(self.key_transform.weight.data)
+        nn.init.xavier_normal_(self.key_transform.bias.data)
+        nn.init.xavier_normal_(self.value_transform.weight.data)
+        nn.init.xavier_normal_(self.value_transform.bias.data)
+
     def forward(self, queries, keys, values):
         # (n, l, 60) -> (n, l, 12)
         queries = self.query_transform(queries)

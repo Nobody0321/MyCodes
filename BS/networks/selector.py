@@ -220,7 +220,10 @@ class SelfSoftAttSelector(nn.Module):
         self.dropout = nn.Dropout(self.config.dropout)
         self.self_attn = attn(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
         self.soft_attn = SelfSelectiveAttention(self.config, self.config.hidden_dim)
-        self.linear = nn.Linear(self.output_dim, self.config.num_classes)
+        # self.linear = nn.Linear(self.output_dim, self.config.num_classes)
+        self.scope = None
+        self.attention_query = None  # will be replaced with attention id in training
+        self.label = None
 
     def forward(self, x):
         """
@@ -228,25 +231,34 @@ class SelfSoftAttSelector(nn.Module):
         :param x: output of sentence encoder, (n, 230)
         :return:
         """
-        tower_repre = []
+        # tower_repre = []
+        self.soft_attn.scope = self.scope
+        self.soft_attn.attention_query = self.attention_query  # will be replaced with attention id in training
+        self.soft_attn.label = self.label
+        stack_repre = None
         for i in range(len(self.scope) - 1):
             sen_vec_one_bag = x[self.scope[i]: self.scope[i + 1]]  # (bag_size, 230)
-            sen_vec_one_bag = sen_vec_one_bag.unsqueeze(0)  # (1, bag_size, 230)
-            final_repre = self.self_attn(sen_vec_one_bag).squeeze()  # (1, bag_size, 230) -> (bag_size, 230)
-            tower_repre.append(final_repre)
-        stack_repre = torch.stack(tower_repre)  # (n, 230)
+            final_repre = self.self_attn(
+                sen_vec_one_bag.unsqueeze(0)).squeeze(0)  # (1, bag_size, 230) -> (bag_size, 230)
+            if stack_repre is None:
+                stack_repre = final_repre
+            else:
+                stack_repre = torch.cat((stack_repre, final_repre), dim=0)
         stack_repre = self.dropout(stack_repre)
         logits = self.soft_attn(stack_repre)  # (n, 53) -> (batch_size, 53)
         return logits
 
     def test(self, x):
-        tower_repre = []
+        self.soft_attn.scope = self.scope
+        stack_repre = None
         for i in range(len(self.scope) - 1):
             sen_vec_one_bag = x[self.scope[i]: self.scope[i + 1]]  # (bag_size, 230)
-            sen_vec_one_bag = sen_vec_one_bag.unsqueeze(0)  # (1, bag_size, 230)
-            final_repre = self.self_attn(sen_vec_one_bag).squeeze()  # (1, bag_size, 230) -> (bag_size, 230)
-            tower_repre.append(final_repre)
-        stack_repre = torch.stack(tower_repre)  # (batch_size, 230)
+            final_repre = self.self_attn(
+                sen_vec_one_bag.unsqueeze(0)).squeeze(0)  # (1, bag_size, 230) -> (bag_size, 230)
+            if stack_repre is None:
+                stack_repre = final_repre
+            else:
+                stack_repre = torch.cat((stack_repre, final_repre), dim=0)
         stack_repre = self.dropout(stack_repre)
-        score = self.soft_attn.test(stack_repre)
-        return score
+        scores = self.soft_attn.test(stack_repre)
+        return scores

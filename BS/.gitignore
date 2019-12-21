@@ -1,10 +1,4 @@
-mini_dataset-*
-checkpoint*
-raw_data*
-logs/
-data*/
-__pycache__*
-.idea*
-
-*.log
-*.pyc
+data
+logs
+checkpoint
+test_result

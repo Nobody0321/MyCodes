@@ -178,7 +178,7 @@ class SelfAttMaxSelector(nn.Module):
         self.input_dim = input_dim
         self.output_dim = input_dim
         self.dropout = nn.Dropout(self.config.dropout)
-        self.attn = attn(config=config, input_dim=self.input_dim)
+        self.attn = attn(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
         self.linear = nn.Linear(self.output_dim, self.config.num_classes)
 
     def forward(self, x):

@@ -129,7 +129,7 @@ class BiGru(nn.Module):
 
 
 class SelfAttention(nn.Module):
-    def __init__(self, config, input_dim, output_dim):
+    def __init__(self, config, input_dim, output_dim=None):
         super(SelfAttention, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -154,10 +154,10 @@ class SentenceAtt(nn.Module):
     def __init__(self, word_dim):
         super(SentenceAtt, self).__init__()
         self.linear = nn.Linear(in_features=word_dim, out_features=1, bias=False)  # (230, 1)
-    #     self.init()
-    #
-    # def init(self):
-    #     nn.init.normal_(self.linear.weight.data)
+        self.init()
+
+    def init(self):
+        nn.init.uniform_(self.linear.weight.data)
 
     def forward(self, sentence_vec):
         """
@@ -166,7 +166,7 @@ class SentenceAtt(nn.Module):
         :return:
         """
         sentence_vec = torch.tanh(sentence_vec)  # (120, 230)
-        attention_weights = F.softmax(self.linear(sentence_vec), dim=-1)  # (120, 230) * 230, 1  = (120, 1)
+        attention_weights = F.softmax(self.linear(sentence_vec), dim=0)  # (120, 230) * 230, 1  = (120, 1)
         sentence_vec = torch.matmul(torch.transpose(attention_weights, 0, 1), sentence_vec)  # (1, 120) * (120,230)
         sentence_vec = torch.tanh(sentence_vec)
         return sentence_vec

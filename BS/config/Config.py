@@ -6,6 +6,7 @@ import torch
 import torch.optim as optim
 import sklearn.metrics
 from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
 
 
 class Accuracy(object):
@@ -80,6 +81,9 @@ class Config(object):
         log_handler.setFormatter(log_format)
         logger.addHandler(log_handler)
         self.logger = logger
+
+    def init_writer(self):
+        self.writer = SummaryWriter(self.log_dir)
 
     def set_data_path(self, data_path):
         self.data_dir = data_path
@@ -337,8 +341,10 @@ class Config(object):
         best_p = None
         best_r = None
         best_epoch = 0
+        self.init_writer()
         self.init_logger("train-" + self.model.__name__)
         for epoch in range(self.train_start_epoch, self.max_epoch):
+            total_loss = 0
             print("Epoch " + str(epoch) + " starts...")
             self.logger.info("Epoch " + str(epoch) + " starts...")
             self.acc_NA.clear()
@@ -348,7 +354,13 @@ class Config(object):
             np.random.shuffle(self.data_train_order)  # shuffle the bags labels" idx
             for batch_num in range(self.train_batches_num):
                 self.get_train_batch(batch_num)
+
                 loss = self.train_one_step()
+                total_loss += loss
+
+                self.writer.add_scalar("Train Loss", loss, (epoch-1) * self.train_batches_num + batch_num)
+                self.writer.add_scalar("Train Not NA Accuracy",  self.acc_not_NA.get(), batch_num)
+
                 time_str = datetime.datetime.now().isoformat()
                 info_massage = "epoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, " \
                                "total accuracy: %f\r" % (
@@ -364,6 +376,9 @@ class Config(object):
                     # one epoch is over
 
             # if epoch % self.test_epoch == 0:
+            ave_loss = total_loss / self.train_batches_num
+            self.writer.add_scalar("Epoch Loss", ave_loss, epoch)
+
             self.testModel = self.trainModel
             auc, pr_x, pr_y = self.test_one_epoch()
             np.save(os.path.join(self.test_result_dir, self.model.__name__ + str(epoch) + "_x.npy"), pr_x)
@@ -435,6 +450,7 @@ class Config(object):
         best_auc = 0.0
         best_p = None
         best_r = None
+        self.init_writer()
         self.init_logger("test-" + self.model.__name__)
         for epoch in self.epoch_range:
             path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch))

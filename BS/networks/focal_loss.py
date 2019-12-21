@@ -39,9 +39,9 @@ class FocalLoss(nn.Module):
         preds_softmax = preds_softmax.gather(1, labels.view(-1, 1))  # select the score for gt label
         preds_logsoft = preds_logsoft.gather(1, labels.view(-1, 1))  # select the loss for gt label
         # 以上计算原始交叉熵完毕
-        self.alpha = self.alpha.gather(0, labels.view(-1))  # get alpha for gt label
+        alpha = self.alpha.gather(0, labels.view(-1))  # get alpha for gt label
         loss = -torch.mul(torch.pow((1 - preds_softmax), self.gamma), preds_logsoft)  # (1-pt)**γ
-        loss = torch.mul(self.alpha, loss.t())  # α * (1-pt)**γ
+        loss = torch.mul(alpha, loss.t())  # α * (1-pt)**γ
         if self.size_average:
             loss = loss.mean()
         else:

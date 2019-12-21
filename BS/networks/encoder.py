@@ -95,7 +95,6 @@ class soft_attention(nn.Module):
         return torch.stack(ret)
 
 
-
 # in pyTorch BiGru takes a 3-dim tensor as input, where the first dim represents the sentence_len,
 # the second dim represents the batch_size,, and the third dim represents the word embedding_size
 class BiGru(nn.Module):
@@ -132,7 +131,6 @@ class BiGru(nn.Module):
 class SelfAttention(nn.Module):
     def __init__(self, config, input_dim, output_dim):
         super(SelfAttention, self).__init__()
-        self.config = config
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.encoders = nn.ModuleList(
@@ -152,6 +150,28 @@ class SelfAttention(nn.Module):
         return x  # (n, l, 230)
 
 
+class SentenceAtt(nn.Module):
+    def __init__(self, word_dim):
+        super(SentenceAtt, self).__init__()
+        self.linear = nn.Linear(in_features=word_dim, out_features=1, bias=False)  # (230, 1)
+    #     self.init()
+    #
+    # def init(self):
+    #     nn.init.normal_(self.linear.weight.data)
+
+    def forward(self, sentence_vec):
+        """
+
+        :param sentence_vec: (120, 230)
+        :return:
+        """
+        sentence_vec = torch.tanh(sentence_vec)  # (120, 230)
+        attention_weights = F.softmax(self.linear(sentence_vec), dim=-1)  # (120, 230) * 230, 1  = (120, 1)
+        sentence_vec = torch.matmul(torch.transpose(attention_weights, 0, 1), sentence_vec)  # (1, 120) * (120,230)
+        sentence_vec = torch.tanh(sentence_vec)
+        return sentence_vec
+
+
 class SelfAttEncoder(nn.Module):
     def __init__(self, config, input_dim, output_dim=None):
         super(SelfAttEncoder, self).__init__()
@@ -159,7 +179,7 @@ class SelfAttEncoder(nn.Module):
         self.input_dim = input_dim
         self.output_dim = input_dim if output_dim is None else output_dim
         self.attn_encoder = SelfAttention(config, self.input_dim, self.output_dim)
-        # self.pooling = (config)
+        # self.pooling = SentenceAtt(self.config.hidden_dim)
 
     def forward(self, x):
         """
@@ -168,4 +188,23 @@ class SelfAttEncoder(nn.Module):
         x = self.attn_encoder(x)  # (n, l, 230)
         # perform max pooling in one sentence
         x = torch.max(x, dim=1)[0]  # (n, l, 230) -> (n, 230)
+        # x = torch.stack([self.pooling(each).squeeze() for each in x])  # (n, l, 230) -> (n, 230)
+        return x  # (n, 230)
+
+
+class SelfSoftAttEncoder(nn.Module):
+    def __init__(self, config, input_dim, output_dim=None):
+        super(SelfSoftAttEncoder, self).__init__()
+        self.config = config
+        self.input_dim = input_dim
+        self.output_dim = input_dim if output_dim is None else output_dim
+        self.attn_encoder = SelfAttention(config, self.input_dim, self.output_dim)
+        self.pooling = SentenceAtt(self.config.hidden_dim)
+
+    def forward(self, x):
+        """
+        x : output of last layer, (n=batch_size, l=sen_len, 60)
+        """
+        x = self.attn_encoder(x)  # (n, l, 230)
+        x = torch.stack([self.pooling(each).squeeze() for each in x])  # (n, l, 230) -> (n, 230)
         return x  # (n, 230)

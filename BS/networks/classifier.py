@@ -27,11 +27,7 @@ class Classifier2(nn.Module):
         self.config = config
         self.label = None
         # self.loss = nn.CrossEntropyLoss()
-<<<<<<< HEAD
-        self.loss = FocalLoss(num_classes=config.num_classes)
-=======
         self.loss = FocalLoss(num_classes=config.num_classes, size_average=True)
->>>>>>> 651c319435849811baf16606ea5ea81d1048c89d
 
     def forward(self, logits):
         """

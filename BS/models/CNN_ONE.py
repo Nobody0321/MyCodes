@@ -7,4 +7,4 @@ class CNN_ONE(Model):
 	def __init__(self, config):
 		super(CNN_ONE, self).__init__(config)
 		self.encoder = CNN(config)
-		self.selector = One(config, config.hidden_size)
+		self.selector = One(config, config.hidden_dim)

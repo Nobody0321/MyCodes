@@ -25,20 +25,20 @@ class _PiecewisePooling(nn.Module):
     def __init(self):
         super(_PiecewisePooling, self).__init__()
 
-    def forward(self, x, mask, hidden_size):
+    def forward(self, x, mask, hidden_dim):
         mask = torch.unsqueeze(mask, 1)
         x, _ = torch.max(mask + x, dim=2)
         x = x - 100
-        return x.view(-1, hidden_size * 3)
+        return x.view(-1, hidden_dim * 3)
 
 
 class _MaxPooling(nn.Module):
     def __init__(self):
         super(_MaxPooling, self).__init__()
 
-    def forward(self, x, hidden_size):
+    def forward(self, x, hidden_dim):
         x, _ = torch.max(x, dim=1)
-        return x.view(-1, hidden_size)
+        return x.view(-1, hidden_dim)
 
 
 class PCNN(nn.Module):
@@ -68,7 +68,7 @@ class CNN(nn.Module):
     def forward(self, embedding):
         embedding = torch.unsqueeze(embedding, dim=1)
         x = self.cnn(embedding)
-        x = self.pooling(x, self.config.hidden_size)
+        x = self.pooling(x, self.config.hidden_dim)
         return self.activation(x)
 
 
@@ -106,7 +106,7 @@ class BiGru(nn.Module):
         self.dropout = config.attn_dropout  # 0.1
         self.input_dim = config.input_dim  #
         self.out_channels = config.output_dim // 2  # hidden dim // 2 = 256 // 2 = 256
-        self.rnn = nn.GRU(input_size=self.input_dim, hidden_size=self.out_channels, bidirectional=True)
+        self.rnn = nn.GRU(input_size=self.input_dim, hidden_dim=self.out_channels, bidirectional=True)
         self.attn = SelfAttEncoder(config)
 
     def init_hidden(self):

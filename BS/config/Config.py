@@ -95,8 +95,8 @@ class Config(object):
     def set_num_classes(self, num_classes):
         self.num_classes = num_classes
 
-    def set_hidden_size(self, hidden_size):
-        self.hidden_dim = hidden_size
+    def set_hidden_dim(self, hidden_dim):
+        self.hidden_dim = hidden_dim
 
     def set_window_size(self, window_size):
         self.window_size = window_size

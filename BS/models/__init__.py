@@ -7,3 +7,7 @@ from .self_self import self_self
 from .SelfMaxSelfSoft import SelfMaxSelfSoft
 from .SelfSoftSelfSoft import SelfSoftSelfSoft
 from .SelfSoftFocal import SelfSoftFocal
+<<<<<<< HEAD
+=======
+from .PCNN_selfmax import PCNN_selfmax
+>>>>>>> 651c319435849811baf16606ea5ea81d1048c89d

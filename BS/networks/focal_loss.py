@@ -41,7 +41,11 @@ class FocalLoss(nn.Module):
         # 以上计算原始交叉熵完毕
         alpha = self.alpha.gather(0, labels.view(-1))  # get alpha for gt label
         loss = -torch.mul(torch.pow((1 - preds_softmax), self.gamma), preds_logsoft)  # (1-pt)**γ
+<<<<<<< HEAD
         loss = torch.mul(alpha, loss.t())  # α * (1-pt)**γ
+=======
+        loss = torch.mul(alpha, loss.t())  # α * (1-pt)**γ * loss
+>>>>>>> 651c319435849811baf16606ea5ea81d1048c89d
         if self.size_average:
             loss = loss.mean()
         else:

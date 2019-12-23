@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .encoder import SelfAttention as attn
+from .encoder import SelfAttention, SelfMaxAttEncoder
+
 
 
 class Selector(nn.Module):
@@ -178,7 +179,7 @@ class SelfAttMaxSelector(nn.Module):
         self.input_dim = input_dim
         self.output_dim = input_dim
         self.dropout = nn.Dropout(self.config.dropout)
-        self.attn = attn(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
+        self.attn = SelfMaxAttEncoder(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
         self.linear = nn.Linear(self.output_dim, self.config.num_classes)
 
     def forward(self, x):
@@ -212,13 +213,13 @@ class SelfAttMaxSelector(nn.Module):
 
 
 class SelfSoftAttSelector(nn.Module):
-    def __init__(self, config, input_dim):
+    def __init__(self, config, input_dim, output_dim):
         super(SelfSoftAttSelector, self).__init__()
         self.config = config
         self.input_dim = input_dim
-        self.output_dim = input_dim
+        self.output_dim = output_dim
         self.dropout = nn.Dropout(self.config.dropout)
-        self.self_attn = attn(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
+        self.self_attn = SelfAttention(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
         self.soft_attn = SelfSelectiveAttention(self.config, self.config.hidden_dim)
         self.scope = None
         self.attention_query = None  # will be replaced with attention id in training

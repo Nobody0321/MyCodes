@@ -21,11 +21,15 @@
 }
 
 \abstractCHN{
-远程监督机制由于其使用机器自动标注数据，减少了大量标注人力的优点，逐渐成为了知识图谱构建中关系抽取任务的主要手段。然而，机器自动标注的样本实例，包含了大量的噪声信息，导致了很多基于远程监督数据训练的模型的效果并不理想。
+远程监督机制由于其使用机器自动标注数据，能减少大量标注人力的优点，
+逐渐成为了知识图谱构建中关系抽取任务的主要手段。然而，机器自动标注的样本实例，
+包含了大量的噪声信息，导致了很多基于远程监督数据训练的模型的效果并不理想。
 为了解决这个问题，本文提出了一个新型的网络结构，称之为层次注意力机制。
-该网络结构将注意力机制组织为层次结构，以更好地应对数据噪声，捕获句子的特征，句袋(sentence bag)特征。
-使用自注意力机制作为这两个层次特征的主要的编码器，构建了一个抗噪能力较强的远程监督机制的关系抽取器。
-实验表明，该模型在性能方面超过了现有的许多模型。
+该网络结构将注意力机制组织为层次结构，以更好地应对数据噪声，捕获句子的特征，
+句袋(sentence bag)特征。
+本文使用自注意力机制作为这两个层次特征的主要的编码器，
+构建了一个抗噪能力较强的远程监督机制的关系抽取器。
+实验表明，该模型在许多方面效果都超过了现有的许多模型。
 }
 \keywordCHN{深度学习\ 自然语言处理 \ 知识图谱 \ 关系抽取\ 注意力机制\ 远程监督}
 
@@ -38,19 +42,29 @@
 %----------------------------------------------------------
 
 \section{引言}
-随着知识图谱技术在金融，风控，情报，个性化推荐等领域中发挥越来越重要的作用。快速地自动化地构建知识图谱，尤其是其子任务实体识别和关系抽取，成为了自然语言处理领域的重要研究课题。
-远程监督机制，启发式地将知识库中的三元组与分结构化文本对齐，自动化地标注大量训练数据，不用耗费大量人力物力去手动标注，为构建大规模标注语料库找到了更快的方法，逐渐成为了现在关系抽取领域的一个重要工具。
-远程监督机制基于一个最基本的假设：如果两个实体\textbf{e\uline{}1}和\textbf{e\uline{}2}之间存在关系\textbf{r}，那么语料库中所有包含这两个实体的句子，我们都认为可以表述关系\textbf{r}，也会被标注为关系\textbf{r}的训练实例。
-例如，在知识库中给定实体对\textbf{姚明}，\textbf{上海}，以及他们之间的关系 \textit{born\uline{}in}，我们可以将语料库中所有同时包含实体\textbf{姚明}， \textbf{上海}的句子标注，认为它们表达了关系\textit{born\uline{}in}。
+随着知识图谱技术在金融，风控，情报，个性化推荐等领域中发挥越来越重要的作用。
+快速地自动化地构建知识图谱，尤其是其子任务实体识别和关系抽取，
+成为了自然语言处理领域的重要研究课题。
+远程监督机制，启发式地将知识库中的三元组与分结构化文本对齐，
+自动化地标注大量训练数据，不用耗费大量人力物力去手动标注，
+为构建大规模标注语料库找到了更快的方法，逐渐成为了现在关系抽取领域的一个重要工具。
+远程监督机制基于一个最基本的假设：
+如果两个实体\textbf{e\_1}和\textbf{e\_2}之间存在关系\textbf{r}，
+那么语料库中所有包含这两个实体的句子，我们都认为可以表述关系\textbf{r}，
+也会被标注为关系\textbf{r}的训练实例。
+例如，在知识库中给定实体对\textbf{姚明}，\textbf{上海}，
+以及他们之间的关系 \textit{born\_in}，
+我们可以将语料库中所有同时包含实体\textbf{姚明}， \textbf{上海}的句子标注，
+认为它们表达了关系\textit{born\_in}。
 
 远程监督尽管明显降低了用于标注的海量人力和时间，但由于其依赖于一个过于绝对的假设，所以总是会构建出一个充满了错误标注噪声的训练数据。
-在现实世界中，往往不是每一个句子都会表述我们想要的关系。例如，"姚明，生于中国上海市，祖籍江苏省苏州市吴江区震泽镇，著名篮球运动员"，表述了\textit{born\uline{}in}关系，
+在现实世界中，往往不是每一个句子都会表述我们想要的关系。例如，"姚明，生于中国上海市，祖籍江苏省苏州市吴江区震泽镇，著名篮球运动员"，表述了\textit{born\_+in}关系，
 而句子“2009年，姚明收购上海男篮，成为上海大鲨鱼篮球俱乐部老板。”并不能体现这个关系。
 在真实世界中，远程监督标注的数据总是有着大量类似的噪声数据，有时受限于语料库的质量，关于一对实体的标注数据甚至可能一个正确的实例都没有，这也造成了基于远程监督训练的深度学习模型性能普遍一般。
 在单个句子分类能力已经达到了较好水平的情况下，在充满了大量噪声的远程监督数据上，如何训练一个能克服噪声性能良好的分类器，成为了当下研究者关注的重点
 
 
-为了缓解应对远程监督带来的大量噪声问题，Ridel \cite{bib1} 等人提出来了多实例学习方法。
+为了缓解应对远程监督带来的大量噪声问题，Ridel\cite{bib1} 等人提出来了多实例学习方法。
 Ridel将远程监督的假设放宽松，首先我们将标注为一对实体某个关系的所有句子实例称为一个句袋（sentence bag），
 Ridel等人认为一个句袋中至少可以有一个句子实例表述了标注的关系，这也称为“至少一个”假设（at least one assumption）。在学习中我们可以只学习一个句袋中最有可能的句子实例，大大降低了噪声数据带来的影响，提升了提取器的性能。
 使用了“至少一个”假设学习策略的提取器，最大的瓶颈是在句子特征提取上。
@@ -60,10 +74,11 @@ Ridel等人认为一个句袋中至少可以有一个句子实例表述了标注
 这类句子特征生成的最大问题是特征的准确度依赖于这些工具，如果这些工具的准确率不高，也会对后续的分类准确度有着一定的影响。
 其次，当句子过长，这类标注工具的准确率会急剧下降。
 
+
 鉴于深度学习方法在图像领域取得了巨大的成功，自然语言领域也引入了这一强有力的工具，用来自动化地提取自然文本的语义特征。
-分段最大池化卷积网络（PCNNs)\cite{bib3}，长短时记忆网络（Long Short Term Memory Network）等都在关系抽取领域的句子特征提取上取得了成功。
-然而，CNN与LSTM在提取长序列的语义特征上，依然有其天然的不足。CNN由于卷积核尺寸的限制，无法获取一个长距离的依赖关系。
-而LSTM虽然克服了RNN在长距离依赖上的梯度消失问题，却依然不能够处理过于长的序列。
+卷积神经网络（PCNNs)\cite{bib11}，长短时记忆网络（LongShort Term Memory Network）\cite{bib10} 等都在关系抽取领域的句子特征提取上取得了成功。
+然而，CNN与LSTM在提取长序列的语义特征上，依然有其天然的不足。CNN由于卷积核尺寸的限制，无法很好的捕获一个长距离的依赖关系。
+而LSTM虽然克服了RNN在长距离依赖上的梯度消失问题，却依然不能够很好的理解距离过于远的依赖关系。
 
 为了能够有效地降低训练数据中的噪声，除了上文中所提到的“至少一个”策略，软注意力机制机制也被广泛使用。
 软注意力机制机制在句袋内部，通过计算每一个句子与最终结果的相似度，实现了注意力权重的再分配，有效地利用了句袋内的噪声与非噪声信息。
@@ -74,142 +89,163 @@ Ridel等人认为一个句袋中至少可以有一个句子实例表述了标注
 其次，在句袋层面，我们同样采用了一个基于自注意力机制的句袋编码器，能够更好的在充满噪声数据的句袋中捕获有效信息。在提升
 实验结果表明我们的句子编码器能够比PCNN和BiLSTM模型取得更好的句子编码效果，句袋编码器能够比多实例学习方法有更好的降噪效果。
 \section{相关工作}
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.9\textwidth]{structure.png} 
+\caption{模型结构图}
+\label{fig:fig1}
+\end{figure}
 为了解决在有监督的关系抽取研究中标注数据较少的问题，Minz\cite{bib1}等人提出了一种称为远程监督（Distant Supervision）的标注方法。
 该方法利用已有的知识库，启发式地将知识库中现存的三元组与语料对齐，从而自动化地获得大量的的标注数据。
-然而远程监督假设过于绝对，其认为只要一个句子中有两个在知识库中的实体，并且这两个实体在知识库中存在关系\textbg{r}，就认为这个句子表述了关系\textbf{r}，并将其标注为\textbf{r}。
+然而远程监督假设过于绝对，其认为只要一个句子中有两个在知识库中的实体，并且这两个实体在知识库中存在关系\textit{r}，就认为这个句子表述了关系\textbf{r}，并将其标注为\textbf{r}。
 这个绝对的假设，也为远程监督的标注的数据集带来了海量的噪声。
-为了解决远程监督带来的噪声问题，多实例学习首先被Ridel等人 \cite{bib2}提出，采用了一个更为宽松的假设，同一对实体标注为关系\textbg{r}的所有句子中，至少有一对确实表述了关系\textbg{r}。
+
+为了解决远程监督带来的噪声问题，多实例学习首先被Ridel\cite{bib2}等人提出，该方法采用了一个更为宽松的假设，假设含有同一对实体且标注为关系\textit{r}的所有句子中，至少有一对确实表述了关系\textit{r}。
 以上的学习方法多依赖于手工特征或者使用外部标注工具标注的特征作为句子特征，严重依赖于标注的准确性，也会导致误差传播问题。
-为了解决在关系抽取时句子特征的提取问题，随着深度学习在其他领域的大获成功，也逐渐被引入了关系抽取领域。Zeng 等人首次提出了使用PCNNs作为特征提取器。
-PCNNs网络将句子从实体对断开成三段，在三段上分别使用最大池化，一定程度上提取了句子的结构信息。BILSTM——ATT使用 BiLSTM模型，更好地在序列上捕获了长期依赖关系。
-此外，为了解决远程监督的错误标签问题，Qinghua使用了句袋间的软注意力机制，提取了句袋中与相关关系最为重要的成分，达到了良好的降噪效果。
+为了解决在关系抽取时句子特征的提取问题，随着深度学习在其他领域的大获成功，也逐渐被引入了关系抽取领域。Zeng\cite{bib3} 等人首次提出了使用PCNNs作为特征提取器。
+PCNNs网络将句子从实体对断开成三段，在三段上分别使用最大池化，一定程度上提取了句子的结构信息。
+Zhou\cite{bib7}等人提出BILSTM-Attention模型使用BiLSTM模型和注意力机制，更好捕获了句子中的长期依赖关系。
+
+此外，为了解决远程监督的错误标签问题，Qinghua使用了句袋间的软注意力机制，使用句袋间所有句子的加权和作为句袋特征，达到了良好的降噪效果。
 近年来，更多的研究重点放在使用强化学习对数据集的噪声进行建模，更好的拟合非噪声数据。ACL2019提出使用全局的优化方法，使用贝叶斯概率在关系和句袋之间进行概率计算。也获得了不错的关系。
-2017年来，attention机制进入了人们的视线，google提出了multi head self attention机制，能够更好地捕获长距离序列中各单词之间的依赖关系，同时通过并行化的方法，大大减小了运算时间，提升了效率。
-以self attention机制为核心的transformer网络和bert语言模型也在各种下游任务上取得了最好的效果。
-受到GooGL的启发，我们提出了使用self attention模型为基础的句子编码器和句袋编码器。在句子特征选择和句袋模型选择上，我们选择句子级别和句袋级别soft attention，作为特征蒸馏器。更好地应对了数据噪声。
+2017年来，注意力机制进入了人们的视线，首先是Lin \cite{bib4}等人将软注意力机制应用在远程监督的句袋间降噪上，使用了句袋间的软注意力机制，将句袋间所有句子的加权和作为句袋特征，达到了良好的降噪效果，取得了良好的效果。
+Vaswani\cite{bib5}等人提出了自注意力机制，该机制能够更好地捕获长距离序列中各单词之间的依赖关系，同时通过并行化的方法，大大减小了运算时间，提升了效率。
+以自注意力机制为核心的Transformer网络和BERT语言模型也在机器翻译，对话以及各种下游任务上取得了最好的效果。
+受到自注意力机制的启发，我们提出了使用自注意力模型为核心的句子编码器和句袋编码器。在句子特征选择和句袋模型选择上，我们选择句子级别和句袋级别软注意力机制，作为特征蒸馏器。更好地应对了数据噪声。
 \section{算法模型}
 本章我们主要介绍层次注意力机制的主要结构。
-如图所示，模型主要由两个模块组成：句子特征提取器和句袋特征提取器。第一部分主要通过self attention机制计算数据中每一个句子的特征，可以将含有实体对的自然文本转变成一个定长为d_hidden的实值向量。
-其次是一个句袋特征提取器，同样使用self attention机制，在句袋内部通过注意力机制的权重，对所有句子的特征向量进行重新分配。达到了较好的降噪效果。
+如图所示，模型主要由两个模块组成：句子特征提取器和句袋特征提取器。第一部分主要通过自注意力机制计算数据中每一个句子的特征，可以将含有实体对的自然文本转变成一个定长为$d_{hidden}$的实值向量。
+其次是一个句袋特征提取器，同样使用自注意力机制，在句袋内部通过注意力机制的权重，对所有句子的特征向量进行重新分配。达到了较好的降噪效果。
 \subsection{句子表示学习}
-\subsubsection{词编码 位置编码}
-词编码主要任务是高维稀疏的独热词编码转化为稠密低维的向量表示，目前公认的使用预训练好的词向量能够对下游任务有较好的提升，目前最主流的词编码是google提出的word2vec。该方法使用cbow和skipgram方法，在wikipedia上进行训练。
-\section{相关工作}
+\subsubsection{词编码}
+词编码主要任务是高维稀疏的独热词编码转化为稠密低维的向量表示，方便计算机处理和运算。一个好的词向量，不仅能把单词降维，还可以提供额外的单词语义信息。
+目前公认使用预训练好的词向量能够对下游任务有较好的提升，当前最主流的词编码是Thmos\cite{bib6}等人提出的Word2Vec词向量。Word2Vec使用cbow和skipgram方法，分别在维基百科上进行训练。
+\subsubsection{位置编码}
+在我们的网络中，由于attention模型对于序列中单词的顺序不敏感，我们需要在单词编码中加入位置信息。此外，由于关系抽取情景下，一个句子中最主要的信息是两个实体，所以我们此外还要加入每个单词到句子中两个实体的相对位置信息(实验证明有没有用??)。
+对于一个输入的句子$S_i={w_1, w_2, ..., w_l}$，其中$w_i$表示句中的一个单词，l表示句子的长度，我们将每一个单词$w_i$最终映射为维度为$ d=d_{word} + 2*d_{relative\_position} + d_{absolute\_position}$
 
-\subsection{正文}
+\subsubsection{句子特征提取}
 
-\subsubsection{正文字体}
+如上文所述，我们使用自注意力机制作为句子级别的特征提取器。
+对于一个句子S，其维度为$d_s\in R^{l\times w}$
+我们首先将句子经过h个多头注意力，每一个注意力头$head_j$通过不同的三个矩阵将同一个句子映射成3个$d_{f}$维向量组成的向量组$\{\boldsymbol q_j=W_j^{q}S, \boldsymbol k_j=W_j^{k}S, \boldsymbol v_j=W_j^{v}S\}$
+每一个向量组经过一个Scale Product attention头进行如下计算
 
-通常情况下，我们不建议在正文中使用\LaTeX的各种字体设置命令，例如：不要直接在正文中使用以下的字体命令：
-宋体 \verb|\songti|、黑体 \verb|\heiti|、仿宋 \verb|\fangsong|、楷书 \verb|\kaishu|。
-当需要强调某些文字时，建议使用 \verb|\emph{文字}| 命令，也可以直接使用 \verb|\textbf{加粗文字}| 或 \verb|\textit{倾斜文字}| 等。
+\[ att\_vector_{j} = softmax(\frac{q_{j} k_{j}^{T} }{\sqrt{dim_k}})v_{j}\]
 
-\subsubsection{脚注}
+其中$att\_vector_j$的维度与$q, k, v$相同，
+然后将所有$att\_vector$串联成
+\[attn = Cat\{att\_vector_1,att\_vector_2,...,att\_vector_h\}\]
+其中 $attn$ 维度为$d_{attn} \in R^{l\times w}$
+最后通过一个矩阵将$attn$映射为$Output$, 维度$d_{O} \in R^{l\times d_{hidden}}$
 
-在正文中插入脚注使用 \verb|\footnote{脚注文本}| 命令\footnote{这里放置脚注的文本内容。}。
+对于一个批次的n个句子组成的矩阵$Input$, 维度$d_{I} \in R^{n\times l\times w}$
+通过句子特征提取器，得到$Output$，其维度$d_{O} \in R^{n\times l\times  d_{hidden}}$
 
-\subsubsection{参考文献引用}
+为了蒸馏单词特征，得到维度一定的句子特征表示，我们使用软注意力机制，在每一个句子中各维度之间进行注意力权重分配
 
-在正文中引用参考文献使用序号方式，并根据上下文确定文献引用序号是否采用上标方式。举例：在文献\cite{bib1}中提出一种方法，后续研究对该方法进行了改进\upcite{bib1,bib2}。
+对于每一个输出的句子向量$ H_i \in R^{l \times d_{hidden}} $
+我们将其通过如下运算，得到加权求和后的句子特征向量r
+\[ M= \tanh(H) \]
+\[ \alpha = softmax(w^T M) \]
+\[ r = H \alpha^T \]
 
-\subsection{图形}
+\subsection{句袋表示学习}
+句袋表示学习将一个句袋中的所有句子整合成一个句袋向量$bag\_vector$。
+一个句袋包含了语料库中所有提及实体对$(e1, e2)$的句子。
+在句袋中，每一个句子都是由句子编码器中输出的句子特征向量 $r \in R^{d_{hidden}}$所表示。
+一个句袋可以表示为矩阵$B \in R^{n \times d_{hidden}}$
+对于每一个句袋，我们同样使用一个句袋级别的自注意力机制，将一个句袋内的句子特征进行重新分配。
+我们认为这样可以将句袋中的句子之间的噪声和有效信息重新分配。
+对于一个输入的句袋$B = \{b_1, b_2,...,b_t\}$，其中t表示一个句袋中的句子个数。
+通过自注意力机制，得到编码后的句袋$B = \{a_1, a_2,...,a_t\}$，
+其中句子$a_i$与$b_i$纬度相同，都为$d_{hidden}$。
+在经过自注意力机制编码的句袋间，我们同样使用选择性注意力机制。
+我们根据一个句子特征向量相对于其真实关系向量$r_i$的相似度，提取句袋特征向量$b_i$。
+\[attention\_score_i =  a_i\cdot W_r \cdot r_i\]
 
-本模板提供的文档类 \verb|csoarticle| 本身默认情况下已经包含了 \verb|graphicx| 宏包，因此典型方法是用 \verb|\includegraphics| 命令将图形包含到浮动环境 \verb|figure| 中。图 \ref{fig:sample} 是一个例子。除了 \verb|pdf| 格式外，也支持 \verb|eps|, \verb|jpeg| 等多种格式，具体用法可参看 \verb|graphicx| 宏包的文档。
-\begin{figure}
-\centering\includegraphics[height=6cm]{figsamp}
-\caption{数据曲线图示例}
-\label{fig:sample}
-\end{figure}
+其中$W_r$的维度$d_{W_r} \in R^{d_{hidden}}$。
 
-\subsection{表格}
+对于一个句袋，其中每一个句子$a_i$都可以计算得到一个注意力得分$attention\_score_i$，
+将注意力得分归一化，得到每一个句子对应的注意力权重。
+\[\alpha = softmax({a_1,a_2,...,a_t})\]
 
-使用浮动环境 \verb|table| 的示例见表\ref{tab:sample}。
-\begin{table}
-  \caption{表格示例}
-  \label{tab:sample}
-  \centering
-  \begin{tabular}{lcr}%{|l|c|r|}
-    \hline
-    求解算法                & 系数矩阵的规模    & 执行时间(秒)  \\
-    \hline
-    Gauss消去法(直接法)     & Mat1903           &  113.27       \\
-    Jacobi点迭代            & Mat1784           &  201.36       \\
-    \hline
-  \end{tabular}
+最后求各句子向量的加权和，得到一个句袋的特征表示向量
+\[bag\_vector = sum(\alpha  B)\]
+
+上文中$attention\_score_i$， $bag\_vector$的维度分别为$d_T$，$d_{hidden}$。
+
+\subsection{训练}
+在深度学习领域，训练的目的是通过梯度下降和反向传播算法，在迭代中不断减小算法输出与真实情况的差距。
+我们选择交叉熵函数用于衡量网络输出与真实情况的差距的目标函数，不断更新网络的参数。
+在我们的网络中交叉熵公式如下：
+\[ CE =-\sum _{i}y_i \log q_i\]
+
+其中$y$是一个句袋独热形式的真实标签，$q$是网络输出的一个句袋在所有标签上的得分。
+\section{实验与评估}
+本章我们将本文提出的模型与现有的许多模型进行对比实验。
+我们的实验在处理器 Intel Core i9-9820X 3.30GHz 显卡 RTX 2080TI 11G, 内存 32G 的计算机上进行训练的。
+
+\subsection{数据集与评价标准}
+我们使用了Ridel\cite{bib2}等人提出的远程监督标准数据集NYT-10。该数据集将Freebase知识库与纽约时报的语料对齐，现在已经成为了大量方法的评价数据集
+NYT10数据集中一共有52种关系外加一个NA关系。
+其中训练集包含522,611个句子, 281,270对实体，测试集包含172,448个句子和96,678个实体对。
+我们使用了留出法作为模型验证方法，只在训练集上训练模型，只在测试集上测试模型。
+我们使用前N个实例的准确率作为评价指标。
+
+\subsection{训练设置}
+为了方便比较，与前人工作\cite{bib3, bib4}相同，我们设置词嵌入向量维度为50，每一个位置嵌入向量维度为5。
+我们选择230为句子向量的维度，同样我们也将句袋特征的维度设置为230。
+对于自注意力的句子编码器，我们将多头注意力的头个数$n\_heads$设置为5，以便将230维的单词向量平均地映射。
+此外我们将注意力模块的个数$n\_blocks$设置为1。
+
+对于句袋级别的自注意力编码器，设置与句级别编码器相同。
+我们使用Adma优化器来更新模型参数。初始学习率设置为0.0001。此外，我们在输出层使用Dropout用以防止模型过拟合
+\subsection{结果比较}
+我们对每个模型训练20轮，挑选效果最好的进行对比。
+
+\begin{table}[!htbp]
+
+\begin{tabular}{|l|c|c|c|c|c|c|r|}
+Model & P\@30& P\@50& P\@100 & P\@200 &P\@300& Max F1\\
+\hline  
+PCNN\_ATT & 0.8264& 0.8700& \textbf{0.8094}& 0.7492& 0.6820&0.4059 \\
+PCNN\_AVE & 0.7179& 0.7211& 0.6988& 0.6912& 0.6438& 0.3829\\
+LayerAttention & \textbf{0.9316}& \textbf{0.9074}& 0.7974& \textbf{0.7536}& \textbf{0.7604}&0.3194\\
+\end{tabular}
+\caption{指标对比}
 \end{table}
 
-\subsection{数学公式}
-
-本模板提供的文档类 \verb|csoarticle| 本身默认情况下已经包含了 \verb|amsmath| 和 \verb|amsthm| 宏包，因此可以使用这些宏包中提供的一切命令。带编号的数学公式建议使用 \verb|align| 环境。举例如下：一元二次方程
-\begin{align}\label{eq:sample}
-    a x^2 + b x + c = 0
-\end{align}
-的两个根为
-\begin{align}\label{eq:root}
-    x_1 &= \frac{-b + \sqrt{b^2 - 4ac}}{2a} \\
-    x_2 &= \frac{-b - \sqrt{b^2 - 4ac}}{2a}
-\end{align}
-其中，方程\eqref{eq:sample}中的系数$a \not= 0$。
-
-数学类内容中常用的定理类环境也可以直接使用，举例如下（\emph{均为虚拟例子，切勿进行技术性探究}）：
-\begin{lemma}\label{lem:levy}
-    引理的具体内容。
-\end{lemma}
-\begin{proof}
-    可参看各类数学分析类教材，此处从略。
-\end{proof}
-
-\begin{theorem}[牛顿第二定律]\label{thm:newton}
-物体的质量$m$、物体所受的力$F$以及物体运动的加速度$a$之间满足
-\begin{align}\label{eq:f-eq-ma}
-    F = m a
-\end{align}
-\end{theorem}
-\begin{proof}
-由引理\ref{lem:levy}及文献\cite{bib1}第15章的定理4可立得。
-\end{proof}
-
-请直接查看以上例子的源代码部分。
-
-\subsection{参考文献的格式要求}
-
-文献数量应不低于6篇，综述文章文献数量不低于25篇。
-
-注：文中所引的参考文献, 作者均应认真阅读过, 对文献的作者、题目、发表的刊物、年份、卷期号和起止页码等均应核实无误，并按在正文出现的先后顺序编号。标引的序号两边加“[ ]”，作者不超过3人的姓名都写， 超过3人的第三人后面加“，等（et al）” 。无论中外署名，一律姓（大写）先名后，作者姓名之间以逗号分隔。参考文献一律置于文末。文献正文中所有非英文文献需写出对应的英文译文，具体格式要求如下（例子请参看本模板文后的参考文献）：
-\begin{enumerate}
-\item\textbf{期刊:}     作者. 论文题目[J]. 刊名，年，卷（期）：起始页码～终止页码.
-\item\textbf{专著:}     作者. 书名[M]. 出版地：出版社，出版年.
-\item\textbf{译著:}     作者. 书名[M]. 译者. 出版地：出版社，出版年.
-\item\textbf{论文集:}   作者. 论文题目[A]. 编者. 文集[C]. 出版地：出版社，出版年. 起始页码～终止页码.
-\item\textbf{学位论文:} 作者. 论文题目[D]. 所在城市：保存单位，年份.
-\item\textbf{技术标准:} 起草责任者，技术标准代号顺序号—发布年. 技术标准名称[S]. 出版地：出版社，出版年.其中，起草责任者、出版地、出版社、出版年可省。
-\item\textbf{专利:}     申请者. 专利名[P]. 国名及专利号，发布日期.
-\item\textbf{技术报告:} 作者. 文题[R]. 地名：责任单位，报告代码及编号，年份.
-\item\textbf{报纸文章:} 作者. 文题[N]. 报纸名，出版日期（版次）.
-\item\textbf{在线文献:} 作者. 文题[OL]. [日期]. http://......
-\item\textbf{光盘文献:} 作者. 文题[CD]. 出版地：出版者，出版日期.
-\item\textbf{其他文献:} 作者. 文题[Z]. 出版地：出版者，出版日期.
-\end{enumerate}
-
+从上表中我们可以看出，虽然在总体F1上我们的模型较为逊色，但是在TopN的准确率上，我们的模型已经追平甚至超越了很多现有的算法。
+对于金融、医疗、风控等领域，分类的准确性至关重要，往往一条准确的数据比千万条模糊的数据更能起到重要的作用。这种场景下，我们的算法表现更好。    
+\subsection{模块效果分析}
+为了更好的分析我们的算法在句子编码和句袋编码方面的具体提升，我们使用PCNN代替自注意力机制作为句袋编码器，对比测试句袋编码上的效果提升；
+同样使用软注意力机制替代自注意力机制，对比分析模型在句袋降噪上的改进。
 \section{结论}
+关系抽取是自然语言处理、知识图谱领域的重要子任务。研究如何快速高效的从语料库中识别实体之间的关系，为构建知识图谱提供了良好的基础，也是知识图谱在金融、征信、风控、医疗等领域发挥重要作用的第一步。
+本文将自注意力机制结合软注意力机制，在句子特征提取，噪声句子消除等方面对现有模型进行了改进。实验结果表明，我们的算法模型在一些指标上赶上和超过了现有模型。
+在研究中发现，由于知识库的局限性，远程监督标注数据大部分标签是无效信息NA，我们在训练中并没有充分利用这部分信息，此外虽然我们的模型在句袋降噪上有了进一步提升，但还是不能够充分的消除噪声，
+这也导致模型的学习效率和最终性能与其他领域类似任务相比有很大差距。这一点也是我们下一步的研究重点。
+% \section*{致谢}
 
-本文给出了………
-
-\section*{致谢(可选)}
-
-应向对论文有帮助的有关人士或单位表示谢意。
 
 
 %----------------------------------------------------------
 % 3. 参考文献
 %----------------------------------------------------------
 
-\begin{thebibliography}{15} % 这里的2是指参考文献总数目，需要根据实际情况进行修改
-    \bibitem{bib1} Mike Mintz, Stevens Bills, Rion Snow, et al. Distant supervision for relation extraction without labeled data, \textit{Proc. Joint Conf. 47th Annu. Meeting ACL 4th Int. Joint Conf. Natural Lang. Process. (AFNLP) Assoc. Comput. Linguistics}, Aug. 2009, pp. 1003–1011.
-    \bibitem{bib2} S. Riedel, L. Yao, and A. McCallum, Modeling relations and their mentions without labeled text, \textit{Proc. Joint Eur. Conf. Mach. Learn. Knowl. Discovery Databases.} Berlin, Germany: Springer, 2010, pp. 148–163.
-    \bibitem{bib3} Zeng Daojian, Liu Kang, Chen Yubo, et al., Distant Supervision for Relation Extraction via Piecewise Convolutional Neural Networks
-    \bibitem{bib4} Lin Yankai, Shen Shiqi,Liu Zhiyuan, et al., Neural Relation Extraction with Selective Attention over Instances
-    \bibitem{bib5} Vaswani，Ashish，Shazeer Noam，Parmar Niki，et al.,Attention Is AL You Need，31st Conference on Neural Information Processing Systems (NIPS 2017), Long Beach, CA, USA.
+\begin{thebibliography}{15}
+    \bibitem{bib1} Mike Mintz, Stevens Bills, Rion Snow, et al. Distant supervision for relation extraction without labeled data, Proceedings of the 47th Annual Meeting of the ACL and the 4th IJCNLP of the AFNLP, 2009
+    \bibitem{bib2} Riedel Sebastian, Yao Limin, McCallum Andrew , Modeling relations and their mentions without labeled text, Proc. Joint Eur. Conf. Mach. Learn. Knowl. Discovery Databases, Berlin, Germany: Springer, 2010
+    \bibitem{bib3} Zeng Daojian, Liu Kang, Chen Yubo, et al., Distant Supervision for Relation Extraction via Piecewise Convolutional Neural Networks, Proceedings of the 2015 Conference on Empirical Methods in Natural Language Processing, 2015
+    \bibitem{bib4} Lin Yankai, Shen Shiqi, Liu Zhiyuan, et al., Neural Relation Extraction with Selective Attention over Instances, Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics, 2016
+    \bibitem{bib5} Vaswani，Ashish，Shazeer Noam，Parmar Niki，et al., Attention Is AL You Need，31st Conference on Neural Information Processing Systems (NIPS 2017), 2017, Long Beach, CA, USA.
+    \bibitem{bib6} Thome Mikolov, Sutskever Ilya , Chen K, et al., Distributed representations of words and phrases and their compositionality, Neural information processing systems, 2013.
+    \bibitem{bib7} Zhou Peng, Shi Wei, Tian Jun, et al.,  Attention-Based Bidirectional LongShort-Term Memory Networks for Relation Classsification, Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics, 2016
+    \bibitem{bib8} Ji Guoliang, Liu Kang, He Shizhu, et al., Distant Supervision for Relation Extraction with Sentence-Level Attention and Entity Descriptions, Proceedings of the Thirty-First AAAI Conference on Artificial Intelligence, 2017
+    \bibitem{bib9} Yuan Yujin, Liu Liyuan, Tang Siliang, et al., Cross-Relation Cross-Bag Attention for Distantly-Supervised Relation Extraction，Thirty-Third AAAI Conference on Artificial Intelligence (AAAI-19), 2019
+    \bibitem{bib10} Cai Rui, Zhang Xiaodong, Wang Houfeng, Bidirectional Recurrent Convolutional NeuralNetwork for Relation Classsification, Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics, 2016
+    \bibitem{bib11} Zeng Daojian, Liu Kang, Lai Siwei，et al., Relation Classification via Convolutional Deep Neural Network,Proceedings of COLING 2014, the 25th International Conference on Computational Linguistics, 2014
 \end{thebibliography}
 
 \end{document}

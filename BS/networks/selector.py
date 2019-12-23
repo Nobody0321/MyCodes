@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .encoder import SelfAttention as attn
+from .encoder import SelfAttention, SelfMaxAttEncoder
+
 
 
 class Selector(nn.Module):
@@ -53,7 +54,7 @@ class SelfSelectiveAttention(Selector):
         :return: attention sum
         """
         # use relation ids to look up corresponding relation query vector (randomly initialized)
-        relation_vector = self.relation_matrix(self.attention_query)  # (n, 230)  # each sen looks up its relation vec
+        relation_vector = self.relation_matrix(self.attention_query)  # (n, 230) each sen looks up its real relation vec
         # relation weight
         attention_wight = self.attention_matrix(self.attention_query)  # (n, 230)
         attention_logit = torch.sum(bag_vec * attention_wight * relation_vector, 1, True)  # (n, 1)
@@ -178,7 +179,7 @@ class SelfAttMaxSelector(nn.Module):
         self.input_dim = input_dim
         self.output_dim = input_dim
         self.dropout = nn.Dropout(self.config.dropout)
-        self.attn = attn(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
+        self.attn = SelfMaxAttEncoder(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
         self.linear = nn.Linear(self.output_dim, self.config.num_classes)
 
     def forward(self, x):
@@ -212,15 +213,14 @@ class SelfAttMaxSelector(nn.Module):
 
 
 class SelfSoftAttSelector(nn.Module):
-    def __init__(self, config, input_dim):
+    def __init__(self, config, input_dim, output_dim):
         super(SelfSoftAttSelector, self).__init__()
         self.config = config
         self.input_dim = input_dim
-        self.output_dim = input_dim
+        self.output_dim = output_dim
         self.dropout = nn.Dropout(self.config.dropout)
-        self.self_attn = attn(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
+        self.self_attn = SelfAttention(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
         self.soft_attn = SelfSelectiveAttention(self.config, self.config.hidden_dim)
-        # self.linear = nn.Linear(self.output_dim, self.config.num_classes)
         self.scope = None
         self.attention_query = None  # will be replaced with attention id in training
         self.label = None

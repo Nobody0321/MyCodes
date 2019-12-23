@@ -6,3 +6,5 @@ from .self_soft import self_soft
 from .self_self import self_self
 from .SelfMaxSelfSoft import SelfMaxSelfSoft
 from .SelfSoftSelfSoft import SelfSoftSelfSoft
+from .SelfSoftFocal import SelfSoftFocal
+from .PCNN_selfmax import PCNN_selfmax

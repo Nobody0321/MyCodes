@@ -6,6 +6,7 @@ import torch
 import torch.optim as optim
 import sklearn.metrics
 from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
 
 
 class Accuracy(object):
@@ -38,7 +39,7 @@ class Config(object):
         self.log_dir = "./logs"
         self.use_bag = True
         self.use_gpu = True
-        self.use_attn = True
+        self.use_attn = False
         self.max_sen_length = 120  # max sentnece lem
         self.relative_pos_num = 2 * self.max_sen_length  # num of positions = 240
         self.num_classes = 53  # num of relations
@@ -60,12 +61,12 @@ class Config(object):
         self.testModel = None
         self.window_size = 3
         self.epoch_range = None
-        self.input_dim = self.word_embedding_dim + self.pos_embedding_dim * 3  # input dim
+        self.input_dim = self.word_embedding_dim + self.pos_embedding_dim * 2  # input dim
         self.save_iter = 1000
         self.attn_dropout = 0.1
         self.train_start_epoch = 1
         self.batch_size = 50
-        self.d_ff = 1024  # feed forward dim
+        self.d_ff = 256  # feed forward dim
         self.n_heads = 5  # num of scale product attention heads
         self.n_blocks = 1  # encoder blocks
 
@@ -80,6 +81,9 @@ class Config(object):
         log_handler.setFormatter(log_format)
         logger.addHandler(log_handler)
         self.logger = logger
+
+    def init_writer(self):
+        self.writer = SummaryWriter(self.log_dir)
 
     def set_data_path(self, data_path):
         self.data_dir = data_path
@@ -158,7 +162,7 @@ class Config(object):
         self.data_train_pos0 = np.load(os.path.join(self.data_dir, "train_pos0.npy"))
         self.data_train_pos1 = np.load(os.path.join(self.data_dir, "train_pos1.npy"))
         self.data_train_pos2 = np.load(os.path.join(self.data_dir, "train_pos2.npy"))
-        # self.data_train_mask = np.load(os.path.join(self.data_path, "train_mask.npy"))
+        self.data_train_mask = np.load(os.path.join(self.data_dir, "train_mask.npy"))
         if self.use_bag:
             self.data_query_label = np.load(os.path.join(self.data_dir, "train_ins_label.npy"))  # 每一句话的 real label
             self.data_train_label = np.load(os.path.join(self.data_dir, "train_bag_label.npy"))  # label for each bag
@@ -180,7 +184,7 @@ class Config(object):
         self.data_test_pos0 = np.load(os.path.join(self.data_dir, "test_pos0.npy"))  #
         self.data_test_pos1 = np.load(os.path.join(self.data_dir, "test_pos1.npy"))  #
         self.data_test_pos2 = np.load(os.path.join(self.data_dir, "test_pos2.npy"))
-        # self.data_test_mask = np.load(os.path.join(self.data_path, "test_mask.npy"))
+        self.data_test_mask = np.load(os.path.join(self.data_dir, "test_mask.npy"))
         if self.use_bag:
             self.data_test_label = np.load(os.path.join(self.data_dir, "test_bag_label.npy"))
             self.data_test_scope = np.load(os.path.join(self.data_dir, "test_bag_scope.npy"))
@@ -248,7 +252,7 @@ class Config(object):
         self.postition_embedding0_in_batch = self.data_train_pos0[index, :]
         self.postition_embedding1_in_batch = self.data_train_pos1[index, :]
         self.postition_embedding2_in_batch = self.data_train_pos2[index, :]
-        # self.batch_mask = self.data_train_mask[index, :]
+        self.batch_mask = self.data_train_mask[index, :]
 
         # bags" label ids in one batch, like [12, 15] means relation 12 for bag 0 ans relation 15 for bag 1
         self.batch_label = np.take(self.data_train_label,
@@ -273,7 +277,7 @@ class Config(object):
         self.postition_embedding0_in_batch = self.data_test_pos0[index, :]
         self.postition_embedding1_in_batch = self.data_test_pos1[index, :]
         self.postition_embedding2_in_batch = self.data_test_pos2[index, :]
-        # self.batch_mask = self.data_test_mask[index, :]
+        self.batch_mask = self.data_test_mask[index, :]
         self.batch_scope = scope
 
     def train_one_step(self):
@@ -283,7 +287,7 @@ class Config(object):
         self.trainModel.embedding.pos0 = self.to_tensor(self.postition_embedding0_in_batch)
         self.trainModel.embedding.pos1 = self.to_tensor(self.postition_embedding1_in_batch)
         self.trainModel.embedding.pos2 = self.to_tensor(self.postition_embedding2_in_batch)
-        # self.trainModel.encoder.mask = self.to_var(self.batch_mask)
+        self.trainModel.encoder.mask = self.to_tensor(self.batch_mask)
         self.trainModel.selector.attention_query = self.to_tensor(self.batch_attention_query)
         self.trainModel.selector.label = self.to_tensor(self.batch_label)
         self.trainModel.classifier.label = self.to_tensor(self.batch_label)
@@ -297,7 +301,7 @@ class Config(object):
         del self.trainModel.embedding.pos0
         del self.trainModel.embedding.pos1
         del self.trainModel.embedding.pos2
-        # del self.trainModel.encoder.mask
+        del self.trainModel.encoder.mask
         del self.trainModel.selector.attention_query
         del self.trainModel.selector.label
         del self.trainModel.classifier.label
@@ -319,7 +323,7 @@ class Config(object):
         self.testModel.embedding.pos0 = self.to_tensor(self.postition_embedding0_in_batch)
         self.testModel.embedding.pos1 = self.to_tensor(self.postition_embedding1_in_batch)
         self.testModel.embedding.pos2 = self.to_tensor(self.postition_embedding2_in_batch)
-        # self.testModel.encoder.mask = self.to_var(self.batch_mask)
+        self.testModel.encoder.mask = self.to_tensor(self.batch_mask)
         # no label in test, we do not need labels to calculate loss
         score = self.testModel.test()  # only returns classification result, no need for loss
         # free memory
@@ -327,7 +331,7 @@ class Config(object):
         del self.testModel.embedding.pos0
         del self.testModel.embedding.pos1
         del self.testModel.embedding.pos2
-        # del self.testModel.encoder.mask
+        del self.testModel.encoder.mask
         return score
 
     def train(self):
@@ -337,8 +341,10 @@ class Config(object):
         best_p = None
         best_r = None
         best_epoch = 0
+        self.init_writer()
         self.init_logger("train-" + self.model.__name__)
         for epoch in range(self.train_start_epoch, self.max_epoch):
+            total_loss = 0
             print("Epoch " + str(epoch) + " starts...")
             self.logger.info("Epoch " + str(epoch) + " starts...")
             self.acc_NA.clear()
@@ -348,7 +354,13 @@ class Config(object):
             np.random.shuffle(self.data_train_order)  # shuffle the bags labels" idx
             for batch_num in range(self.train_batches_num):
                 self.get_train_batch(batch_num)
+
                 loss = self.train_one_step()
+                total_loss += loss
+
+                self.writer.add_scalar("Train Loss", loss, (epoch-1) * self.train_batches_num + batch_num)
+                self.writer.add_scalar("Train Not NA Accuracy",  self.acc_not_NA.get(), batch_num)
+
                 time_str = datetime.datetime.now().isoformat()
                 info_massage = "epoch %d step %d time %s | loss: %f, NA accuracy: %f, not NA accuracy: %f, " \
                                "total accuracy: %f\r" % (
@@ -364,6 +376,9 @@ class Config(object):
                     # one epoch is over
 
             # if epoch % self.test_epoch == 0:
+            ave_loss = total_loss / self.train_batches_num
+            self.writer.add_scalar("Epoch Loss", ave_loss, epoch)
+
             self.testModel = self.trainModel
             auc, pr_x, pr_y = self.test_one_epoch()
             np.save(os.path.join(self.test_result_dir, self.model.__name__ + str(epoch) + "_x.npy"), pr_x)
@@ -435,6 +450,7 @@ class Config(object):
         best_auc = 0.0
         best_p = None
         best_r = None
+        self.init_writer()
         self.init_logger("test-" + self.model.__name__)
         for epoch in self.epoch_range:
             path = os.path.join(self.checkpoint_dir, self.model.__name__ + "-" + str(epoch))

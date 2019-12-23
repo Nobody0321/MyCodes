@@ -5,21 +5,21 @@ import json
 in_path = "./raw_data/"
 out_path = "./data"
 case_sensitive = False
-if not os.path.exists('./data'):
-    os.mkdir('./data')
-train_file_name = in_path + 'train.json'
-test_file_name = in_path + 'test.json'
-word_file_name = in_path + 'word_vec.json'
-rel_file_name = in_path + 'rel2id.json'
+if not os.path.exists("./data"):
+    os.mkdir("./data")
+train_file_name = in_path + "train.json"
+test_file_name = in_path + "test.json"
+word_file_name = in_path + "word_vec.json"
+rel_file_name = in_path + "rel2id.json"
 
 
 def find_pos(sentence, head, tail):
     def find(sentence, entity):
-        p = sentence.find(' ' + entity + ' ')
+        p = sentence.find(" " + entity + " ")
         if p == -1:
-            if sentence[:len(entity) + 1] == entity + ' ':
+            if sentence[:len(entity) + 1] == entity + " ":
                 p = 0
-            elif sentence[-len(entity) - 1:] == ' ' + entity:
+            elif sentence[-len(entity) - 1:] == " " + entity:
                 p = len(sentence) - len(entity)
             else:
                 p = 0
@@ -27,7 +27,7 @@ def find_pos(sentence, head, tail):
             p += 1
         return p
 
-    sentence = ' '.join(sentence.split())
+    sentence = " ".join(sentence.split())
     p1 = find(sentence, head)
     p2 = find(sentence, tail)
     words = sentence.split()
@@ -45,11 +45,11 @@ def find_pos(sentence, head, tail):
 
 def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_sensitive=False, is_training=True):
     if file_name is None or not os.path.isfile(file_name):
-        raise Exception("[ERROR] Data file doesn't exist")
+        raise Exception("[ERROR] Data file does not exist")
     if word_vec_file_name is None or not os.path.isfile(word_vec_file_name):
-        raise Exception("[ERROR] Word vector file doesn't exist")
+        raise Exception("[ERROR] Word vector file does not exist")
     if rel2id_file_name is None or not os.path.isfile(rel2id_file_name):
-        raise Exception("[ERROR] rel2id file doesn't exist")
+        raise Exception("[ERROR] rel2id file does not exist")
 
     print("Loading data file...")
     ori_data = json.load(open(file_name, "r"))
@@ -64,24 +64,24 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_s
     if not case_sensitive:
         print("Eliminating case sensitive problem...")
         for i in ori_data:
-            i['sentence'] = i['sentence'].lower()
-            i['head']['word'] = i['head']['word'].lower()
-            i['tail']['word'] = i['tail']['word'].lower()
+            i["sentence"] = i["sentence"].lower()
+            i["head"]["word"] = i["head"]["word"].lower()
+            i["tail"]["word"] = i["tail"]["word"].lower()
         for i in ori_word_vec:
-            i['word'] = i['word'].lower()
+            i["word"] = i["word"].lower()
         print("Finish eliminating")
 
     # vec
     print("Building word vector matrix and mapping...")
     word2id = {}
     word_vec_mat = []
-    word_size = len(ori_word_vec[0]['vec'])
+    word_size = len(ori_word_vec[0]["vec"])
     print("Got {} words of {} dims".format(len(ori_word_vec), word_size))
     for i in ori_word_vec:
-        word2id[i['word']] = len(word2id)
-        word_vec_mat.append(i['vec'])
-    word2id['UNK'] = len(word2id)
-    word2id['BLANK'] = len(word2id)
+        word2id[i["word"]] = len(word2id)
+        word_vec_mat.append(i["vec"])
+    word2id["UNK"] = len(word2id)
+    word2id["BLANK"] = len(word2id)
     word_vec_mat.append(np.random.normal(loc=0, scale=0.05, size=word_size))
     word_vec_mat.append(np.zeros(word_size, dtype=np.float32))
     word_vec_mat = np.array(word_vec_mat, dtype=np.float32)
@@ -89,7 +89,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_s
 
     # sorting
     print("Sorting data...")
-    ori_data.sort(key=lambda a: a['head']['id'] + '#' + a['tail']['id'] + '#' + a['relation'])
+    ori_data.sort(key=lambda a: a["head"]["id"] + "#" + a["tail"]["id"] + "#" + a["relation"])
     print("Finish sorting")
 
     sen_tot = len(ori_data)
@@ -108,11 +108,11 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_s
             print(i)
         sen = ori_data[i]
         # sen_label
-        if sen['relation'] in rel2id:
-            sen_label[i] = rel2id[sen['relation']]
+        if sen["relation"] in rel2id:
+            sen_label[i] = rel2id[sen["relation"]]
         else:
-            sen_label[i] = rel2id['NA']
-        words = sen['sentence'].split()
+            sen_label[i] = rel2id["NA"]
+        words = sen["sentence"].split()
         # sen_len
         sen_len[i] = min(len(words), max_length)
         # sen_word
@@ -121,16 +121,16 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_s
                 if word in word2id:
                     sen_word[i][j] = word2id[word]
                 else:
-                    sen_word[i][j] = word2id['UNK']
+                    sen_word[i][j] = word2id["UNK"]
         for j in range(j + 1, max_length):
-            sen_word[i][j] = word2id['BLANK']
+            sen_word[i][j] = word2id["BLANK"]
 
-        pos1, pos2 = find_pos(sen['sentence'], sen['head']['word'], sen['tail']['word'])
+        pos1, pos2 = find_pos(sen["sentence"], sen["head"]["word"], sen["tail"]["word"])
         if pos1 == -1 or pos2 == -1:
             raise Exception(
-                "[ERROR] Position error, index = {}, sentence = {}, head = {}, tail = {}".format(i, sen['sentence'],
-                                                                                                 sen['head']['word'],
-                                                                                                 sen['tail']['word']))
+                "[ERROR] Position error, index = {}, sentence = {}, head = {}, tail = {}".format(i, sen["sentence"],
+                                                                                                 sen["head"]["word"],
+                                                                                                 sen["tail"]["word"]))
         if pos1 >= max_length:
             pos1 = max_length - 1
         if pos2 >= max_length:
@@ -153,9 +153,9 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_s
                 sen_mask[i][j] = [0, 0, 100]
         # bag_scope
         if is_training:
-            tup = (sen['head']['id'], sen['tail']['id'], sen['relation'])
+            tup = (sen["head"]["id"], sen["tail"]["id"], sen["relation"])
         else:
-            tup = (sen['head']['id'], sen['tail']['id'])
+            tup = (sen["head"]["id"], sen["tail"]["id"])
         if bag_key == [] or bag_key[len(bag_key) - 1] != tup:
             bag_key.append(tup)
             bag_scope.append([i, i])
@@ -198,16 +198,16 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_s
         name_prefix = "train"
     else:
         name_prefix = "test"
-    np.save(os.path.join(out_path, 'vec.npy'), word_vec_mat)
-    np.save(os.path.join(out_path, name_prefix + '_word.npy'), sen_word)
-    np.save(os.path.join(out_path, name_prefix + '_pos0.npy'), sen_pos0)
-    np.save(os.path.join(out_path, name_prefix + '_pos1.npy'), sen_pos1)
-    np.save(os.path.join(out_path, name_prefix + '_pos2.npy'), sen_pos2)
-    np.save(os.path.join(out_path, name_prefix + '_mask.npy'), sen_mask)
-    np.save(os.path.join(out_path, name_prefix + '_bag_label.npy'), bag_label)
-    np.save(os.path.join(out_path, name_prefix + '_bag_scope.npy'), bag_scope)
-    np.save(os.path.join(out_path, name_prefix + '_ins_label.npy'), ins_label)
-    np.save(os.path.join(out_path, name_prefix + '_ins_scope.npy'), ins_scope)
+    np.save(os.path.join(out_path, "vec.npy"), word_vec_mat)
+    np.save(os.path.join(out_path, name_prefix + "_word.npy"), sen_word)
+    np.save(os.path.join(out_path, name_prefix + "_pos0.npy"), sen_pos0)
+    np.save(os.path.join(out_path, name_prefix + "_pos1.npy"), sen_pos1)
+    np.save(os.path.join(out_path, name_prefix + "_pos2.npy"), sen_pos2)
+    np.save(os.path.join(out_path, name_prefix + "_mask.npy"), sen_mask)
+    np.save(os.path.join(out_path, name_prefix + "_bag_label.npy"), bag_label)
+    np.save(os.path.join(out_path, name_prefix + "_bag_scope.npy"), bag_scope)
+    np.save(os.path.join(out_path, name_prefix + "_ins_label.npy"), ins_label)
+    np.save(os.path.join(out_path, name_prefix + "_ins_scope.npy"), ins_scope)
     print("Finish saving")
 
 

@@ -13,6 +13,8 @@ result_dir = "./test_result"
 
 def main():
     models = sys.argv[1:]
+    # models = os.listdir("./test_result")
+    # models = [each[:-6] for each in models if each.endswith("npy")]
     for model in models:
         x = np.load(os.path.join(result_dir, model + "_x.npy"))  # best p
         y = np.load(os.path.join(result_dir, model + "_y.npy"))  # best r

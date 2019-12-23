@@ -12,7 +12,7 @@ class _CNN(nn.Module):
         self.in_height = self.config.max_sen_length
         self.in_width = self.config.input_dim
         self.kernel_size = (self.config.window_size, self.in_width)
-        self.out_channels = self.config.hidden_size
+        self.out_channels = self.config.hidden_dim
         self.stride = (1, 1)
         self.padding = (1, 0)
         self.cnn = nn.Conv2d(self.in_channels, self.out_channels, self.kernel_size, self.stride, self.padding)
@@ -53,7 +53,7 @@ class PCNN(nn.Module):
     def forward(self, embedding):
         embedding = torch.unsqueeze(embedding, dim=1)
         x = self.cnn(embedding)
-        x = self.pooling(x, self.mask, self.config.hidden_size)
+        x = self.pooling(x, self.mask, self.config.hidden_dim)
         return self.activation(x)
 
 
@@ -172,14 +172,14 @@ class SentenceAtt(nn.Module):
         return sentence_vec
 
 
-class SelfAttEncoder(nn.Module):
+class SelfMaxAttEncoder(nn.Module):
     def __init__(self, config, input_dim, output_dim=None):
-        super(SelfAttEncoder, self).__init__()
+        super(SelfMaxAttEncoder, self).__init__()
         self.config = config
         self.input_dim = input_dim
         self.output_dim = input_dim if output_dim is None else output_dim
         self.attn_encoder = SelfAttention(config, self.input_dim, self.output_dim)
-        # self.pooling = SentenceAtt(self.config.hidden_dim)
+        self.pooling = torch.max
 
     def forward(self, x):
         """
@@ -187,7 +187,7 @@ class SelfAttEncoder(nn.Module):
         """
         x = self.attn_encoder(x)  # (n, l, 230)
         # perform max pooling in one sentence
-        x = torch.max(x, dim=1)[0]  # (n, l, 230) -> (n, 230)
+        x = self.pooling(x, dim=1)[0]  # (n, l, 230) -> (n, 230)
         # x = torch.stack([self.pooling(each).squeeze() for each in x])  # (n, l, 230) -> (n, 230)
         return x  # (n, 230)
 

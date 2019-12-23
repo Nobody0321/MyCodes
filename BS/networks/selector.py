@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from .encoder import SelfAttention, SelfMaxAttEncoder
 
 
-
 class Selector(nn.Module):
     def __init__(self, config, encoder_output_dim):
         """
@@ -46,75 +45,41 @@ class Selector(nn.Module):
         raise NotImplementedError
 
 
-class SelfSelectiveAttention(Selector):
-    def _attention_train_logit(self, bag_vec):
-        """
-        calculate attention logit
-        :param bag_vec: sentences (n, 230)
-        :return: attention sum
-        """
-        # use relation ids to look up corresponding relation query vector (randomly initialized)
-        relation_vector = self.relation_matrix(self.attention_query)  # (n, 230) each sen looks up its real relation vec
-        # relation weight
-        attention_wight = self.attention_matrix(self.attention_query)  # (n, 230)
-        attention_logit = torch.sum(bag_vec * attention_wight * relation_vector, 1, True)  # (n, 1)
+class Attention(Selector):
+    def _attention_train_logit(self, x):
+        relation_query = self.relation_matrix(self.attention_query)
+        attention = self.attention_matrix(self.attention_query)
+        attention_logit = torch.sum(x * attention * relation_query, 1, True)
         return attention_logit
 
-    def _attention_test_logit(self, bag_vec):
-        """
-        calculate attention logit each sentence in bag
-        :param bag_vec: sen vectors in a bag : (n, 230)
-        :return: attention sum vector for each sentence
-        """
-        # (n, 230) * (230, 53) -> (n, 53)
-        # do not perform sum here
-        attention_logit = torch.matmul(bag_vec,
-                                       torch.transpose(self.attention_matrix.weight * self.relation_matrix.weight, 0,
-                                                       1))
+    def _attention_test_logit(self, x):
+        attention_logit = torch.matmul(x, torch.transpose(self.attention_matrix.weight * self.relation_matrix.weight, 0,
+                                                          1))
         return attention_logit
 
     def forward(self, x):
-        """
-        perform soft attention
-        :param x: (n=sen_num in bag, 230)
-        :return:
-        """
-        attention_logit = self._attention_train_logit(x)  # attention score (batch_size, 1)
+        attention_logit = self._attention_train_logit(x)
         tower_repre = []
         for i in range(len(self.scope) - 1):
-            sen_matrix = x[self.scope[i]: self.scope[i + 1]]  # (bag_size, 230)
-            attention_weight = F.softmax(torch.transpose(attention_logit[self.scope[i]: self.scope[i + 1]], 0, 1),
-                                         1)  # (1, bag_size)
-            final_bag_feature = torch.squeeze(torch.matmul(attention_weight,
-                                                           sen_matrix))  # (1, 230) -> (230), do not perform sum here, leave it to classifier
-            tower_repre.append(final_bag_feature)
-        stack_repre = torch.stack(tower_repre)  # (batch_size, 230)
-        stack_repre = self.dropout(stack_repre)  # (batch_size, 230)
-        logits = self.get_logits(stack_repre)  # (batch_size, 53)
+            sen_matrix = x[self.scope[i]: self.scope[i + 1]]
+            attention_score = F.softmax(torch.transpose(attention_logit[self.scope[i]: self.scope[i + 1]], 0, 1), 1)
+            final_repre = torch.squeeze(torch.matmul(attention_score, sen_matrix))
+            tower_repre.append(final_repre)
+        stack_repre = torch.stack(tower_repre)
+        stack_repre = self.dropout(stack_repre)
+        logits = self.get_logits(stack_repre)
         return logits
 
     def test(self, x):
-        """
-        perform soft attention for testing
-        :param x: (n, 230)
-        :return:
-        """
-        attention_logit = self._attention_test_logit(x)  # (n, 53)  # 一个batch中所有句子对于所有关系的attention score
+        attention_logit = self._attention_test_logit(x)
         tower_output = []
         for i in range(len(self.scope) - 1):
-            sen_matrix = x[self.scope[i]: self.scope[i + 1]]  # (bag_size, 230)
-
-            # 一个relation对于bag中所有句子的attention weight
-            attention_weight = F.softmax(torch.transpose(attention_logit[self.scope[i]: self.scope[i + 1]], 0, 1),
-                                         1)  # (bag_size, 53) ->  (53, bag_size)
-            # final repre 的第i行表示对应关系i的经过soft attention的bag vector  每一个关系对应的bag vector
-            final_repre = torch.matmul(attention_weight,
-                                       sen_matrix)  # (53, bag_size) * (bag_size, 230) -> (53, 230)  # use attention score to integrate bag
-            # 每一个关系对应的bag vector，对应的所有关系的得分
-            logits = self.get_logits(final_repre)  # (53, 53)
-            # 取对角线得到每一个relation对应的bag vector 对应的 这个relation的得分，就是这个bag在所有53个relation的得分
-            tower_output.append(torch.diag(F.softmax(logits, 1)))  # (53)  # 对角线上的元素表示了每一个关系对应的attention score?
-        stack_output = torch.stack(tower_output)  # (batch_num, 53)
+            sen_matrix = x[self.scope[i]: self.scope[i + 1]]
+            attention_score = F.softmax(torch.transpose(attention_logit[self.scope[i]: self.scope[i + 1]], 0, 1), 1)
+            final_repre = torch.matmul(attention_score, sen_matrix)
+            logits = self.get_logits(final_repre)
+            tower_output.append(torch.diag(F.softmax(logits, 1)))
+        stack_output = torch.stack(tower_output)
         return list(stack_output.data.cpu().numpy())
 
 
@@ -167,11 +132,6 @@ class Average(Selector):
         return list(score.data.cpu().numpy())
 
 
-# class SoftAttention(nn.Module):
-#     def __init__(self):
-#         super(SoftAttention, self).__init__()
-#         self.config =
-
 class SelfAttMaxSelector(nn.Module):
     def __init__(self, config, input_dim):
         super(SelfAttMaxSelector, self).__init__()
@@ -220,7 +180,7 @@ class SelfSoftAttSelector(nn.Module):
         self.output_dim = output_dim
         self.dropout = nn.Dropout(self.config.dropout)
         self.self_attn = SelfAttention(config=config, input_dim=self.input_dim, output_dim=self.output_dim)
-        self.soft_attn = SelfSelectiveAttention(self.config, self.config.hidden_dim)
+        self.soft_attn = Attention(self.config, self.config.hidden_dim)
         self.scope = None
         self.attention_query = None  # will be replaced with attention id in training
         self.label = None

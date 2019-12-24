@@ -16,15 +16,17 @@ model = {
     'cnn_one': models.CNN_ONE,
     'cnn_ave': models.CNN_AVE,
     'msnet_att': models.MSNET_ATT,
-    "msnet_layer_att": models.MSNET_Layer_ATT
+    "msnet_layer_att": models.MSNET_Layer_ATT,
+    "bigru": models.BiGru_ATT,
+    "att_pcnn": models.SelfPCNN_ATT
 }
 
 con = config.Config()
 con.set_opt_method("Adam")
 con.set_learning_rate(0.001)
-# con.set_pretrain_model("checkpoint/PCNN_Self-0-0.2997476786396999")
+con.set_pretrain_model("checkpoint/MSNET_Layer_ATT-2-0.2641097740886435")
 con.set_max_epoch(30)
-# con.start_epoch = 4
+con.start_epoch = 3
 con.set_batch_size(50)
 con.load_train_data()
 con.load_test_data()

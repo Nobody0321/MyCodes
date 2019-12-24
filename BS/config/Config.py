@@ -70,10 +70,10 @@ class Config(object):
         self.window_size = 3
         self.epoch_range = None
         self.save_iter = 1000
-        self.input_dim = self.word_size + 2 * self.pos_size
+        self.input_dim = self.word_size + 3 * self.pos_size
         self.n_attn_heads = 5
         self.encoder_output_dim = 230
-        self.attn_dropout = 0.1
+        self.attn_dropout = 0.5
 
     def init_logger(self, log_name):
         if not os.path.exists(self.log_dir):
@@ -343,7 +343,7 @@ class Config(object):
         print("Storing best result...")
         self.logger.info("Finish training")
         self.logger.info("Best epoch = %d | auc = %f" % (best_epoch, best_auc))
-        self.logger.info("Storing best result...")
+        self.logger.info("Storing the best result...")
 
         if not os.path.isdir(self.test_result_dir):
             os.mkdir(self.test_result_dir)

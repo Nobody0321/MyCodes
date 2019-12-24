@@ -7,5 +7,6 @@ from .CNN_ONE import CNN_ONE
 from .PCNN_ONE import PCNN_ONE
 from .MSNET_ATT import MSNET_ATT
 from .PCNN_Self import PCNN_Self
-from .PCNN_SelfMax import PCNN_SelfMax
+from .SelfPCNN_ATT import SelfPCNN_ATT
 from .MSNET_Layer_ATT import MSNET_Layer_ATT
+from .BiGru_ATT import BiGru_ATT

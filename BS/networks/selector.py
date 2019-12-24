@@ -36,40 +36,36 @@ class Selector(nn.Module):
 
 
 class Attention(Selector):
-    def _attention_train(self, x):
+    def _attention_train_logit(self, x):
         relation_query = self.relation_matrix(self.attention_query)
         attention = self.attention_matrix(self.attention_query)
         attention_logit = torch.sum(x * attention * relation_query, 1, True)
+        return attention_logit
+    def _attention_test_logit(self, x):
+        attention_logit = torch.matmul(x, torch.transpose(self.attention_matrix.weight * self.relation_matrix.weight, 0, 1))
+        return attention_logit
+    def forward(self, x):
+        attention_logit = self._attention_train_logit(x)
         tower_repre = []
         for i in range(len(self.scope) - 1):
-            sen_matrix = x[self.scope[i]: self.scope[i + 1]]
-            attention_score = F.softmax(torch.transpose(attention_logit[self.scope[i]: self.scope[i + 1]], 0, 1), 1)
+            sen_matrix = x[self.scope[i] : self.scope[i + 1]]
+            attention_score = F.softmax(torch.transpose(attention_logit[self.scope[i] : self.scope[i + 1]], 0, 1), 1)
             final_repre = torch.squeeze(torch.matmul(attention_score, sen_matrix))
             tower_repre.append(final_repre)
         stack_repre = torch.stack(tower_repre)
         stack_repre = self.dropout(stack_repre)
-        return stack_repre
-
-    def _attention_test(self, x):
-        attention_logit = torch.matmul(x, torch.transpose(self.attention_matrix.weight * self.relation_matrix.weight, 0,
-                                                          1))
+        logits = self.get_logits(stack_repre)
+        return logits
+    def test(self, x):
+        attention_logit = self._attention_test_logit(x)
         tower_output = []
         for i in range(len(self.scope) - 1):
-            sen_matrix = x[self.scope[i]: self.scope[i + 1]]
-            attention_score = F.softmax(torch.transpose(attention_logit[self.scope[i]: self.scope[i + 1]], 0, 1), 1)
+            sen_matrix = x[self.scope[i] : self.scope[i + 1]]
+            attention_score = F.softmax(torch.transpose(attention_logit[self.scope[i] : self.scope[i + 1]], 0, 1), 1)
             final_repre = torch.matmul(attention_score, sen_matrix)
             logits = self.get_logits(final_repre)
             tower_output.append(torch.diag(F.softmax(logits, 1)))
         stack_output = torch.stack(tower_output)
-        return stack_output
-
-    def forward(self, x):
-        stack_repre = self.cal_attention_vec(x)
-        logits = self.get_logits(stack_repre)
-        return logits
-
-    def test(self, x):
-        stack_output = self._attention_test(x)
         return list(stack_output.data.cpu().numpy())
 
 
@@ -122,7 +118,73 @@ class Average(Selector):
         return list(score.data.cpu().numpy())
 
 
+class SenSoftAtt(nn.Module):
+    def __init__(self, config):
+        super(SenSoftAtt, self).__init__()
+        self.config = config
+        self.relation_matrix = nn.Parameter(torch.Tensor(self.config.num_classes, config.encoder_output_dim, 1))  # (53, 230, 1)
+        self.assemble_matrix = nn.Parameter(torch.Tensor(self.config.num_classes, config.encoder_output_dim, config.encoder_output_dim))  # 53, 230, 230to calculate
+        self.init_weights()
+        self.scope = None
+        self.attention_query = None  # sentence one hot label
+        self.label = None
+
+    def init_weights(self):
+        # nn.init.xavier_uniform_(self.relation_matrix.data)
+        # nn.init.xavier_uniform_(self.assemble_matrix.data)
+        pass
+
+    def forward(self, x):
+        """n, 120, 230"""
+        # look up correspoding relation vec
+        relation_query = self.relation_matrix[self.attention_query, :]  # (n, 230, 1)
+        assemble = self.assemble_matrix[self.attention_query, :]  # (n, 230, 230)
+        weights = torch.bmm(torch.bmm(x, assemble), relation_query)  # n, 120, 230 * n, 230, 230 * n ,230 ,1 -> n, 120,1
+        weights = F.softmax(weights, dim=1).permute(0, 2, 1)  # n, 120, 1-> n 1 120
+        x = torch.bmm(weights, x).squeeze(1)  # n 1 120 * n 120 230 -> n 1, 230
+        return x
+
+
+class SenSoftAndBagSoftAttention(nn.Module):
+    def __init__(self, config):
+        super(SenSoftAndBagSoftAttention, self).__init__()
+        self.sen_attn = SenSoftAtt(config)
+        self.bag_attn = Attention(config, config.encoder_output_dim)
+        self.scope = None
+        self.attention_query = None
+        self.label = None
+
+    def init_weights(self):
+        nn.init.xavier_uniform_(self.relation_matrix.weight.data)
+        nn.init.normal_(self.bias)
+        nn.init.xavier_uniform_(self.attention_matrix.weight.data)
+
+    def forward(self, x):
+        self.sen_attn.scope = self.scope
+        self.sen_attn.attention_query = self.attention_query
+        self.sen_attn.label = self.label
+        x = self.sen_attn(x)  # n, 120, 230 -> n, 230
+        self.bag_attn.scope = self.scope
+        self.bag_attn.attention_query = self.attention_query
+        self.bag_attn.label = self.label
+        logits = self.bag_attn(x)
+        return logits
+
+    def test(self, x):
+        self.sen_attn.scope = self.scope
+        self.sen_attn.attention_query = self.attention_query
+        self.sen_attn.label = self.label
+        x = self.sen_attn(x)  # n, 120, 230 -> n, 230
+        self.bag_attn.scope = self.scope
+        self.bag_attn.attention_query = self.attention_query
+        self.bag_attn.label = self.label
+        scores = self.bag_attn.test(x)
+        return scores
+
+
+
 from networks.attention import AttEncoderBlock
+
 
 class SelfAttSelector(Selector):
     def __init__(self, config, relation_dim):

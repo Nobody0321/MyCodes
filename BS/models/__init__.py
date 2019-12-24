@@ -8,3 +8,4 @@ from .PCNN_ONE import PCNN_ONE
 from .MSNET_ATT import MSNET_ATT
 from .PCNN_Self import PCNN_Self
 from .PCNN_SelfMax import PCNN_SelfMax
+from .MSNET_Layer_ATT import MSNET_Layer_ATT

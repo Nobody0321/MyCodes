@@ -75,17 +75,6 @@ class CNN(nn.Module):
         return self.activation(x)
 
 
-class SenSoftAtt(nn.Module):
-    def __init__(self, config):
-        super(SenSoftAtt, self).__init__()
-        self.config = config
-        self.relation_matrix = nn.Embedding(self.config.num_classes, config.encoder_output_dim)
-        self.bias = nn.Parameter(torch.Tensor(self.config.num_classes))
-        self.attention_matrix = nn.Embedding(self.config.num_classes, config.encoder_output_dim).
-
-    def forward(self, x):
-
-
 class SelfAttEncoderWithMax(nn.Module):
     def __init__(self, config):
         super(SelfAttEncoderWithMax, self).__init__()
@@ -102,4 +91,22 @@ class SelfAttEncoderWithMax(nn.Module):
         x = self.attn_encoder(embedding)
         # perform max pooling
         x = torch.max(x, dim=1)[0]
+        return x
+
+
+class SelfAttEncoder(nn.Module):
+    def __init__(self, config):
+        super(SelfAttEncoder, self).__init__()
+        self.config = config
+        self.attn_encoder = AttEncoderBlock(d_model=config.input_dim, n_heads=config.n_attn_heads,
+                                            d_output=config.encoder_output_dim, dropout=config.attn_dropout)
+
+    def forward(self, embedding):
+        """
+
+        :param embedding:
+        :return:
+        """
+        x = self.attn_encoder(embedding)
+        # perform max pooling
         return x

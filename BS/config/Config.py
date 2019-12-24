@@ -70,7 +70,7 @@ class Config(object):
         self.window_size = 3
         self.epoch_range = None
         self.save_iter = 1000
-        self.input_dim = self.word_size + 3 * self.pos_size
+        self.input_dim = self.word_size + 2 * self.pos_size
         self.n_attn_heads = 5
         self.encoder_output_dim = 230
         self.attn_dropout = 0.1

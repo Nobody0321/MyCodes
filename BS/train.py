@@ -12,7 +12,7 @@ import argparse
 
 os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 parser = argparse.ArgumentParser()
-parser.add_argument('--model_name', type=str, default='pcnn_selfmax', help='name of the model')
+parser.add_argument('--model_name', type=str, default='pcnn_att', help='name of the model')
 args = parser.parse_args()
 model = {
     'pcnn_att': models.PCNN_ATT,
@@ -22,8 +22,6 @@ model = {
     'cnn_att': models.CNN_ATT,
     'cnn_one': models.CNN_ONE,
     'cnn_ave': models.CNN_AVE,
-    'msnet_net': models.MSNET_ATT,
-    'pcnn_selfmax': models.PCNN_SelfMax
 }
 
 con = config.Config()

@@ -74,7 +74,7 @@ class MultiHeadAttention(nn.Module):
         queries, keys, values: (n, l, d_model)
         """
         x = [attn(queries, keys, values)  # n_heads * (n, l, d_feature)
-             for i, attn in enumerate(self.attn_heads)]
+             for attn in self.attn_heads]
 
         # concatenate again
         x = torch.cat(x, dim=2)  # (n, l, 60)

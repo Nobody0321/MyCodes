@@ -20,9 +20,9 @@ class Selector(nn.Module):
         self.dropout = nn.Dropout(self.config.drop_prob)
 
     def init_weights(self):
-        nn.init.xavier_uniform(self.relation_matrix.weight.data)
-        nn.init.normal(self.bias)
-        nn.init.xavier_uniform(self.attention_matrix.weight.data)
+        nn.init.xavier_uniform_(self.relation_matrix.weight.data)
+        nn.init.normal_(self.bias)
+        nn.init.xavier_uniform_(self.attention_matrix.weight.data)
 
     def get_logits(self, x):
         logits = torch.matmul(x, torch.transpose(self.relation_matrix.weight, 0, 1), ) + self.bias
@@ -36,19 +36,10 @@ class Selector(nn.Module):
 
 
 class Attention(Selector):
-    def _attention_train_logit(self, x):
+    def _attention_train(self, x):
         relation_query = self.relation_matrix(self.attention_query)
         attention = self.attention_matrix(self.attention_query)
         attention_logit = torch.sum(x * attention * relation_query, 1, True)
-        return attention_logit
-
-    def _attention_test_logit(self, x):
-        attention_logit = torch.matmul(x, torch.transpose(self.attention_matrix.weight * self.relation_matrix.weight, 0,
-                                                          1))
-        return attention_logit
-
-    def forward(self, x):
-        attention_logit = self._attention_train_logit(x)
         tower_repre = []
         for i in range(len(self.scope) - 1):
             sen_matrix = x[self.scope[i]: self.scope[i + 1]]
@@ -57,11 +48,11 @@ class Attention(Selector):
             tower_repre.append(final_repre)
         stack_repre = torch.stack(tower_repre)
         stack_repre = self.dropout(stack_repre)
-        logits = self.get_logits(stack_repre)
-        return logits
+        return stack_repre
 
-    def test(self, x):
-        attention_logit = self._attention_test_logit(x)
+    def _attention_test(self, x):
+        attention_logit = torch.matmul(x, torch.transpose(self.attention_matrix.weight * self.relation_matrix.weight, 0,
+                                                          1))
         tower_output = []
         for i in range(len(self.scope) - 1):
             sen_matrix = x[self.scope[i]: self.scope[i + 1]]
@@ -70,6 +61,15 @@ class Attention(Selector):
             logits = self.get_logits(final_repre)
             tower_output.append(torch.diag(F.softmax(logits, 1)))
         stack_output = torch.stack(tower_output)
+        return stack_output
+
+    def forward(self, x):
+        stack_repre = self.cal_attention_vec(x)
+        logits = self.get_logits(stack_repre)
+        return logits
+
+    def test(self, x):
+        stack_output = self._attention_test(x)
         return list(stack_output.data.cpu().numpy())
 
 

@@ -48,7 +48,7 @@ class Config(object):
         self.use_gpu = True
         self.is_training = True
         self.max_length = 120
-        self.pos_num = 1 * self.max_length
+        self.pos_num = 2 * self.max_length
         self.num_classes = 53
         self.hidden_size = 230
         self.pos_size = 5
@@ -74,7 +74,6 @@ class Config(object):
         self.n_attn_heads = 5
         self.encoder_output_dim = 230
         self.attn_dropout = 0.1
-        self.start_epoch = 0
 
     def init_logger(self, log_name):
         if not os.path.exists(self.log_dir):
@@ -287,6 +286,7 @@ class Config(object):
     def test_one_step(self):
         self.testModel.embedding.word = to_var(self.batch_word)
         self.testModel.embedding.pos0 = to_var(self.batch_pos0)
+
         self.testModel.embedding.pos1 = to_var(self.batch_pos1)
         self.testModel.embedding.pos2 = to_var(self.batch_pos2)
         self.testModel.encoder.mask = to_var(self.batch_mask)
@@ -301,7 +301,7 @@ class Config(object):
         best_r = None
         best_epoch = 0
         self.init_logger("train-" + self.model.__name__)
-        for epoch in range(self.start_epoch, self.max_epoch):
+        for epoch in range(self.max_epoch):
             print('Epoch ' + str(epoch) + ' starts...')
             self.logger.info('Epoch ' + str(epoch) + ' starts...')
             self.acc_NA.clear()

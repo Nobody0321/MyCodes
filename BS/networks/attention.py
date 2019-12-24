@@ -63,7 +63,7 @@ class MultiHeadAttention(nn.Module):
         self.d_model = d_model
         self.d_feature = d_model // n_heads
         self.n_heads = n_heads
-
+        self.d_output = d_output
         self.attn_heads = nn.ModuleList([
             AttentionHead(self.d_model, self.d_feature, dropout) for _ in range(n_heads)
         ])
@@ -78,32 +78,24 @@ class MultiHeadAttention(nn.Module):
 
         # concatenate again
         x = torch.cat(x, dim=2)  # (n, l, 60)
-        x = self.projection(x)  # (n, l, 60) -> (n, l, 230)
+        if self.d_model != self.d_output:
+            x = self.projection(x)  # (n, l, 60) -> (n, l, 230)
         return x
 
 
-class EncoderBlock(nn.Module):
-    def __init__(self, d_model, d_ff, n_heads, d_output, dropout):
-        super(EncoderBlock, self).__init__()
+class AttEncoderBlock(nn.Module):
+    def __init__(self, d_model, n_heads, d_output, dropout):
+        super(AttEncoderBlock, self).__init__()
         self.attn_head = MultiHeadAttention(d_model, n_heads, d_output, dropout)
         self.layer_norm1 = nn.LayerNorm(d_output, eps=1e-6)
         self.dropout = nn.Dropout(dropout)
-        # self.position_wise_feed_forward = nn.Sequential(
-        #     nn.Linear(d_output, d_ff),
-        #     nn.ReLU(inplace=True),
-        #     nn.Linear(d_ff, d_output),
-        # )
-        # self.layer_norm2 = nn.LayerNorm(d_output, eps=1e-6)
+       
 
     def forward(self, x):
         """
-        input_x : (n, l, d_model)
+        input_x : (n, l, 60)
         """
         x = self.attn_head(x, x, x)  # self attention (n, l, 60) -> (n, l, 230)
         # Apply normalization and residual connection
         x = x + self.dropout(self.layer_norm1(x))  # (n, l, 230) -> (n, l, 230)
-        # Apply position-wise feed-forward networks
-        # pos = self.position_wise_feed_forward(x)  # (n, l, 230) -> (n, l, d_ff) -> (n, l, 230)
-        # Apply normalization and residual connection
-        # x = x + self.dropout(self.layer_norm2(pos))  # (n, l, 230)
         return x  # (n, l, 230)

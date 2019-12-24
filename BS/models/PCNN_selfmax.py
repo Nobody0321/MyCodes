@@ -1,10 +1,10 @@
-from networks.encoder import PCNN
-from networks.selector import SelfAttMaxSelector
+from networks.encoder import *
+from networks.selector import *
 from .Model import Model
 
 
-class PCNN_selfmax(Model):
-	def __init__(self, config):
-		super(PCNN_selfmax, self).__init__(config)
-		self.encoder = PCNN(config)
-		self.selector = SelfAttMaxSelector(config, input_dim=config.hidden_dim*3)
+class PCNN_SelfMax(Model):
+    def __init__(self, config):
+        super(PCNN_SelfMax, self).__init__(config)
+        self.encoder = PCNN(config)
+        self.selector = SelfAttMaxSelector(config, config.hidden_size * 3)

@@ -1,10 +1,10 @@
-from networks.encoder import PCNN
-from networks.selector import SelfSoftAttSelector
+from networks.encoder import *
+from networks.selector import *
 from .Model import Model
 
 
-class PCNN_self(Model):
+class PCNN_Self(Model):
 	def __init__(self, config):
-		super(PCNN_self, self).__init__(config)
+		super(PCNN_Self, self).__init__(config)
 		self.encoder = PCNN(config)
-		self.selector = SelfSoftAttSelector(config, config.hidden_dim * 3, config.hidden_dim)
+		self.selector = SelfAttSelector(config, config.hidden_size * 3)

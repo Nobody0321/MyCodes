@@ -79,7 +79,7 @@ class SelfAttEncoderWithMax(nn.Module):
     def __init__(self, config):
         super(SelfAttEncoderWithMax, self).__init__()
         self.config = config
-        self.attn_encoder = AttEncoderBlock(d_model=config.encoder_output_dim,n_heads=config.n_attn_heads, d_output=config.encoder_output_dim, dropout=config.attn_dropout)
+        self.attn_encoder = AttEncoderBlock(d_model=config.input_dim, n_heads=config.n_attn_heads, d_output=config.encoder_output_dim, dropout=config.attn_dropout)
 
     def forward(self, embedding):
         """

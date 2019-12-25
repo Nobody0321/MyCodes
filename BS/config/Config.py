@@ -323,6 +323,8 @@ class Config(object):
                 
                 self.testModel = self.trainModel
                 auc, pr_x, pr_y = self.test_one_epoch()
+                np.save(os.path.join(self.test_result_dir, self.model.__name__ + "{}-{}".format(epoch, auc) + '_x.npy'), pr_x)
+                np.save(os.path.join(self.test_result_dir, self.model.__name__ + "{}-{}".format(epoch, auc) + '_y.npy'), pr_y)
                 if auc > best_auc:
                     best_auc = auc
                     best_p = pr_x

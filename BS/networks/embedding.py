@@ -33,8 +33,8 @@ class Embedding(nn.Module):
 
     def forward(self):
         word = self.word_embedding(self.word)
-        pos0 = self.pos0_embedding(self.pos0)
+        # pos0 = self.pos0_embedding(self.pos0)
         pos1 = self.pos1_embedding(self.pos1)
         pos2 = self.pos2_embedding(self.pos2)
-        embedding = torch.cat((word, pos0, pos1, pos2), dim=2)
+        embedding = torch.cat((word, pos1, pos2), dim=2)
         return embedding

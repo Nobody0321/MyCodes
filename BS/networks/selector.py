@@ -141,12 +141,12 @@ class SenSoftAtt(nn.Module):
         :return:
         """
         W = torch.tanh(x)
-        alpha = F.softmax(torch.matmul(W, self.wei_mat), dim=1).view(-1, 1, self.config.max_length)  # n, 1, 120
+        alpha = F.softmax(torch.matmul(W.view(-1, self.config.encoder_output_dim), self.wei_mat), dim=1).view(-1, 1, self.config.max_length)  # n, 1, 120
         x = torch.bmm(alpha, x)  # n, 1, 230
         return x.squeeze(1)  # n, 230
 
 
-class SenLevelAtt(Attention):
+class SenLevelAtt(Selector):
     """
     use word-relation alignment to calculate attention weights
     """
@@ -154,8 +154,10 @@ class SenLevelAtt(Attention):
     def __init__(self, config):
         super(SenLevelAtt, self).__init__(config, config.encoder_output_dim)
         self.config = config
-        self.assemble_matrix = nn.Embedding(config.num_classes, config.encoder_output_dim ** 2)  # 53, 230*230
-        torch.nn.init.xavier_normal_(self.assemble_matrix.weight.data)
+        self.assemble_matrix = nn.Parameter(torch.randn(config.num_classes, config.encoder_output_dim, config.encoder_output_dim))  # 53, 230*230
+        torch.nn.init.xavier_normal_(self.assemble_matrix.data)
+        self.activation = torch.tanh
+        self.bn = nn.BatchNorm1d()
 
     def forward(self, x):
         """
@@ -165,15 +167,16 @@ class SenLevelAtt(Attention):
         # do sentence level att
         # n, 230, 1
         relation_query = self.relation_matrix(self.attention_query).unsqueeze(-1)
-        # n, 230**2
-        assemble = self.assemble_matrix(self.attention_query)
         # n, 230, 230
-        assemble = assemble.view(assemble.size(0), self.config.encoder_output_dim, -1)
+        assemble = self.assemble_matrix[self.attention_query]
         # n, 120, 1
         att_weights = torch.bmm(torch.bmm(x, assemble), relation_query)
+        att_weights = self.dropout(att_weights)
         att_weights = F.softmax(att_weights, dim=1).permute(0, 2, 1)  # n, 120, 1 -> n, 1, 120
         x = torch.bmm(att_weights, x).squeeze(1)  # n, 1, 230 -> n, 230
         # do bag level att
+        x = self.activation(x)
+        x = self.dropout(x)
         sentence_bag_attention = self.attention_matrix(self.attention_query)
         attention_logit = torch.sum(x * sentence_bag_attention * relation_query.squeeze(-1), 1, True)
         tower_repre = []
@@ -197,42 +200,34 @@ class SenLevelAtt(Attention):
         sen_len = x.size(1)
         x = x.view(-1, x.size(-1))  # n*L, 230
         # calculate W*r first,  # 53, 230, 23 * 53,230,1 -> 53, 230
-        ar = torch.bmm(self.assemble_matrix.weight.view(self.config.num_classes, self.config.encoder_output_dim, -1)
-                       , self.relation_matrix.weight.unsqueeze(-1)).squeeze(-1)
+        ar = torch.bmm(self.assemble_matrix.view(self.config.num_classes, self.config.encoder_output_dim, -1)
+                       , self.relation_matrix.weight.data.unsqueeze(-1)).squeeze(-1)
         # n*l, 53
         sen_attention_logit = torch.matmul(x, torch.transpose(ar, 0, 1))
         # n*l, 53->n, l, 53
         # n个句子，每个句子针对53个关系有53种加权和方式
         sen_attention_weights = F.softmax(sen_attention_logit, dim=1).view(batch_num, sen_len, -1)
-        # n, (120, 53) * (53, 230) = n, 53, 230  n个句子，每个句子的53种加权和结果
+        # n, (53, l) * (l, 230) = n, 53, 230  n个句子，每个句子的53种加权和结果
         x = torch.bmm(sen_attention_weights.permute(0, 2, 1), x.view(batch_num, sen_len, -1))
-        # x = x.view(-1, self.config.encoder_output_dim) n*53, 230 把所有加权和结果串联起来
-        # n*53, 53  每一个句子的每一种加权和结果对应53种关系的score，最后只须在bag中整合后取对角线，句子和句袋根据同一种关系取的attention
-        attention_logit = torch.matmul(x.view(-1, self.config.encoder_output_dim),
-                                       torch.transpose(self.attention_matrix.weight * self.relation_matrix.weight, 0,
-                                                       1))
-        # 53, n, 53
-        attention_logit = attention_logit.view(-1, batch_num, self.config.num_classes)
-        # # n, 53, 53 -> n, 53
-        # attention_logit = torch.stack(map(torch.diag, attention_logit.view(batch_num, self.config.num_classes, -1)))
-        x = x.view(self.config.num_classes, -1, self.config.encoder_output_dim)
+        x = self.activation(x)
+        filtered_sen = []
+        for all_sum_sen_vec in x:
+            # all_sum_sen_vec : 53, 230
+            logits = self.get_logits(all_sum_sen_vec)  # 53, 53
+            idx = torch.argmax(torch.diag(F.softmax(logits, 1)))  # 获取这个句子最有可能的关系
+            filtered_sen.append(all_sum_sen_vec[idx])
+        # n, 230
+        x = torch.stack(filtered_sen)
+        x = self.activation(x)
+        attention_logit = torch.matmul(x, torch.transpose(self.attention_matrix.weight * self.relation_matrix.weight, 0, 1))
         tower_output = []
         for i in range(len(self.scope) - 1):
-            sen_matrix = x[:, self.scope[i]: self.scope[i + 1], :]  # r_S, b, 230
-            # r_S, b, rb  一个bag每个句子取53种加权和时分别对应的53维关系得分
-            attention_weight = F.softmax(attention_logit[:, self.scope[i]: self.scope[i + 1], :], 2)
-            # rs, (rb, b) * (b, 230) = rs, rb, 230 一个bag每个句子对应的53种加权和
-            final_repre = torch.bmm(attention_weight.permute(0, 2, 1), sen_matrix)
-            # rs*rb, rb ，一个bag种每一个句子的53种关系的score
-            logits = self.get_logits(final_repre.view(-1, final_repre.size(-1)))  # b,  53, 53
-            # rs, rb, rb
-            logits = logits.view(self.config.num_classes, -1, self.config.num_classes)
-            # rb, rs, rb
-            logits = logits.permute(2, 0, 1)
-            # rb, rs
-            logits = torch.stack(list(map(torch.diag, F.softmax(logits, 2))))
-            tower_output.append(torch.diag(F.softmax(logits, 1)))  # rb
-            # tower_output = [1 - each for each in tower_output]
+            sen_matrix = x[self.scope[i]: self.scope[i + 1]]  # b, d
+            #  53, b
+            attention_score = F.softmax(torch.transpose(attention_logit[self.scope[i]: self.scope[i + 1]], 0, 1), 1)
+            final_repre = torch.matmul(attention_score, sen_matrix)  # 53, d
+            logits = self.get_logits(final_repre)  # 53, 53
+            tower_output.append(torch.diag(F.softmax(logits, 1)))  # 53
         stack_output = torch.stack(tower_output)
         return list(stack_output.data.cpu().numpy())
 
@@ -256,7 +251,8 @@ class SenSoftAndBagSoftAttention(nn.Module):
         self.bag_attn.attention_query = self.attention_query
         self.bag_attn.label = self.label
         x = self.sen_attn(x)  # n, 120, 230 -> n, 230
-        return self.bag_attn(x)
+        x = self.bag_attn(x)
+        return x
 
     def test(self, x):
         """
@@ -271,13 +267,13 @@ class SenSoftAndBagSoftAttention(nn.Module):
         return scores
 
 
-from networks.attention import AttEncoderBlock
+from networks.attention import AttEncoder
 
 
 class SelfAttSelector(Selector):
     def __init__(self, config, relation_dim):
         super(SelfAttSelector, self).__init__(config, relation_dim)
-        self.bag_attn = AttEncoderBlock(d_model=relation_dim, n_heads=config.n_attn_heads, d_output=relation_dim,
+        self.bag_attn = AttEncoder(d_model=relation_dim, n_heads=config.n_attn_heads, d_output=relation_dim,
                                         dropout=config.attn_dropout)
 
     def _attention_train_logit(self, x):
@@ -322,7 +318,7 @@ class SelfAttSelector(Selector):
 class SelfAttMaxSelector(Selector):
     def __init__(self, config, relation_dim):
         super(SelfAttMaxSelector, self).__init__(config, relation_dim)
-        self.bag_attn = AttEncoderBlock(d_model=relation_dim, n_heads=config.n_attn_heads, d_output=relation_dim,
+        self.bag_attn = AttEncoder(d_model=relation_dim, n_heads=config.n_attn_heads, d_output=relation_dim,
                                         dropout=config.attn_dropout)
 
     def forward(self, x):

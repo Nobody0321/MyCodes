@@ -2,7 +2,7 @@ import numpy as np
 import os
 import json
 
-in_path = "./raw_data/"
+in_path = "../../raw_data/"
 out_path = "./data"
 case_sensitive = False
 if not os.path.exists('./data'):

@@ -72,4 +72,5 @@ class PCNN(nn.Module):
         x = torch.max(x, dim=1)[0] - 100
         return x.view(-1, x.size(1) * x.size(2))
 
-    def piecewise_max_pooling(self)
+    def piecewise_max_pooling(self):
+

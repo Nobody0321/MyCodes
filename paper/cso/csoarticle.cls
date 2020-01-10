@@ -39,7 +39,6 @@
 \newcommand\cso@keywordCHN\relax
 \newcommand\cso@keywordENG\relax
 \newcommand\cso@authorIntroduction\relax
-\newcommand\cso@fund\relax
 
 \newcommand\titleCHN[1]{\renewcommand\cso@titleCHN{#1}}
 \newcommand\titleENG[1]{\renewcommand\cso@titleENG{#1}}
@@ -53,7 +52,6 @@
 \newcommand\keywordENG[1]{\renewcommand\cso@keywordENG{#1}}
 \newcommand\cateidCHN[1]{\renewcommand\cso@cateidCHN{#1}}
 \newcommand\authorIntroduction[1]{\renewcommand\cso@authorIntroduction{#1}}
-\newcommand\fund[1]{\renewcommand\cso@fund{#1}}
 
 \ifCSO@GBK
   \input{cso-gbk.def}

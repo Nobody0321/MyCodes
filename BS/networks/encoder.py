@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
-from networks.attention import AttEncoderBlock
+from networks.attention import AttEncoder
 
 
 class _CNN(nn.Module):
@@ -79,7 +79,7 @@ class SelfAttEncoderWithMax(nn.Module):
     def __init__(self, config):
         super(SelfAttEncoderWithMax, self).__init__()
         self.config = config
-        self.attn_encoder = AttEncoderBlock(d_model=config.input_dim, n_heads=config.n_attn_heads, d_output=config.encoder_output_dim, dropout=config.attn_dropout)
+        self.attn_encoder = AttEncoder(d_model=config.input_dim, n_heads=config.n_attn_heads, d_output=config.encoder_output_dim, dropout=config.attn_dropout)
 
     def forward(self, embedding):
         """
@@ -97,15 +97,15 @@ class SelfAttEncoder(nn.Module):
     def __init__(self, config):
         super(SelfAttEncoder, self).__init__()
         self.config = config
-        self.attn_encoder = AttEncoderBlock(d_model=config.input_dim, n_heads=config.n_attn_heads, d_output=config.encoder_output_dim, dropout=config.attn_dropout)
-
+        self.attn_encoder = AttEncoder(n_blocks=config.attn_n_blocks, n_head=config.n_attn_heads, d_k=config.encoder_output_dim, d_v=config.encoder_output_dim,
+                                       d_model=230, dropout=0.1, n_position=200)
     def forward(self, embedding):
         """
 
         :param embedding: n， 120, 65
         :return:
         """
-        x = self.attn_encoder(embedding)  # n, 120, 230
+        x = self.attn_encoder(embedding)  # n, l, encoder_output_dim
         # perform max pooling
         return x
 
@@ -116,21 +116,20 @@ class BiGru_Att(nn.Module):
         self.config = config
         self.rnn = nn.GRU(input_size=config.input_dim, hidden_size=config.encoder_output_dim//2, bidirectional=True)
         self.hidden = nn.Parameter(torch.zeros(2, config.max_length, config.encoder_output_dim//2))
-        self.attn = SelfAttEncoderWithMax(config)
 
     def forward(self, x):
         self.rnn.flatten_parameters()
         output, _ = self.rnn(x, self.hidden)
-        return self.attn(output)  # n, 120 ,23, -> n, 230
+        return output  # n, 120 ,23, -> n, 230
 
 
-class SelfPCNN(nn.Module):
+class BiLstm(nn.Module):
     def __init__(self, config):
-        super(SelfPCNN, self).__init__()
-        self.attn = AttEncoderBlock(d_model=config.input_dim, n_heads=config.n_attn_heads, d_output=config.input_dim, dropout=config.attn_dropout)
+        super(BiLstm, self).__init__()
+        self.config = config
+        self.rnn = nn.LSTM(input_size=config.input_dim, hidden_size=config.encoder_output_dim//2, bidirectional=True)
 
-        self.PCNN = PCNN(config)
-
-    def forward(self, embedding):
-        embedding = self.attn(embedding)
-        return self.PCNN(embedding)
+    def forward(self, x):
+        self.rnn.flatten_parameters()
+        output, _ = self.rnn(x)
+        return output  # n, 120 ,23, -> n, 230

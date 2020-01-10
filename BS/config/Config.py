@@ -70,11 +70,12 @@ class Config(object):
         self.window_size = 3
         self.epoch_range = None
         self.save_iter = 1000
-        self.input_dim = self.word_size + 3 * self.pos_size
-        self.attn_n_blocks = 1
+        self.input_dim = self.word_size + 2 * self.pos_size
+        self.attn_n_blocks = 2
         self.n_attn_heads = 5
-        self.encoder_output_dim = 300
-        self.attn_dropout = 0.5
+        self.encoder_output_dim = 230
+        self.attn_dropout = 0.1
+        self.start_epoch = 0
 
     def init_logger(self, log_name):
         if not os.path.exists(self.log_dir):
@@ -302,7 +303,7 @@ class Config(object):
         best_r = None
         best_epoch = 0
         self.init_logger("train-" + self.model.__name__)
-        for epoch in range(self.max_epoch):
+        for epoch in range(self.start_epoch, self.max_epoch):
             print('Epoch ' + str(epoch) + ' starts...')
             self.logger.info('Epoch ' + str(epoch) + ' starts...')
             self.acc_NA.clear()

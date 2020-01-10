@@ -251,7 +251,8 @@ class SenSoftAndBagSoftAttention(nn.Module):
         self.bag_attn.attention_query = self.attention_query
         self.bag_attn.label = self.label
         x = self.sen_attn(x)  # n, 120, 230 -> n, 230
-        return self.bag_attn(x)
+        x = self.bag_attn(x)
+        return x
 
     def test(self, x):
         """
@@ -266,13 +267,13 @@ class SenSoftAndBagSoftAttention(nn.Module):
         return scores
 
 
-from networks.attention import AttEncoderBlock
+from networks.attention import AttEncoder
 
 
 class SelfAttSelector(Selector):
     def __init__(self, config, relation_dim):
         super(SelfAttSelector, self).__init__(config, relation_dim)
-        self.bag_attn = AttEncoderBlock(d_model=relation_dim, n_heads=config.n_attn_heads, d_output=relation_dim,
+        self.bag_attn = AttEncoder(d_model=relation_dim, n_heads=config.n_attn_heads, d_output=relation_dim,
                                         dropout=config.attn_dropout)
 
     def _attention_train_logit(self, x):
@@ -317,7 +318,7 @@ class SelfAttSelector(Selector):
 class SelfAttMaxSelector(Selector):
     def __init__(self, config, relation_dim):
         super(SelfAttMaxSelector, self).__init__(config, relation_dim)
-        self.bag_attn = AttEncoderBlock(d_model=relation_dim, n_heads=config.n_attn_heads, d_output=relation_dim,
+        self.bag_attn = AttEncoder(d_model=relation_dim, n_heads=config.n_attn_heads, d_output=relation_dim,
                                         dropout=config.attn_dropout)
 
     def forward(self, x):

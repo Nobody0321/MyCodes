@@ -1,6 +1,5 @@
 import sklearn.metrics
 import matplotlib
-
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,7 +11,7 @@ result_dir = './test_result'
 
 def main():
     # models = sys.argv[1:]
-    models = os.listdir("test_result")
+    models = os.listdir(result_dir)
     models = list(set([each[:-6] for each in models if not each.endswith("png")]))
     for model in models:
         x = np.load(os.path.join(result_dir, model + '_x.npy'))
@@ -26,7 +25,7 @@ def main():
 
     plt.xlabel('Recall')
     plt.ylabel('Precision')
-    plt.ylim(0.3, 1.0)
+    plt.ylim(0.3, 0.9)
     plt.xlim(0.0, 0.4)
     plt.title('Precision-Recall')
     plt.legend(loc="upper right")

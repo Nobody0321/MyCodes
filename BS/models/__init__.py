@@ -10,3 +10,5 @@ from .PCNN_Self import PCNN_Self
 from .SelfPCNN_ATT import SelfPCNN_ATT
 from .MSNET_Layer_ATT import MSNET_Layer_ATT
 from .BiGru_ATT import BiGru_ATT
+from .MSNet_Layer_att2 import MSNet_Layer_att2
+from .MSNet_ff_att import Msnet_ff_att

@@ -3,8 +3,8 @@ from networks.selector import SenSoftAndBagSoftAttention
 from .Model import Model
 
 
-class MSNET_Layer_ATT(Model):
+class Msnet_ff_att(Model):
 	def __init__(self, config):
-		super(MSNET_Layer_ATT, self).__init__(config)
+		super(Msnet_ff_att, self).__init__(config)
 		self.encoder = SelfAttEncoder(config)
 		self.selector = SenSoftAndBagSoftAttention(config)

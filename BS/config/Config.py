@@ -42,7 +42,7 @@ class Config(object):
         self.acc_NA = Accuracy()
         self.acc_not_NA = Accuracy()
         self.acc_total = Accuracy()
-        self.data_path = './data'
+        self.data_path = '../data'
         self.log_dir = "./logs"
         self.use_bag = True
         self.use_gpu = True
@@ -71,8 +71,9 @@ class Config(object):
         self.epoch_range = None
         self.save_iter = 1000
         self.input_dim = self.word_size + 3 * self.pos_size
+        self.attn_n_blocks = 1
         self.n_attn_heads = 5
-        self.encoder_output_dim = 230
+        self.encoder_output_dim = 300
         self.attn_dropout = 0.5
 
     def init_logger(self, log_name):
@@ -325,12 +326,6 @@ class Config(object):
                 auc, pr_x, pr_y = self.test_one_epoch()
                 np.save(os.path.join(self.test_result_dir, self.model.__name__ + "{}-{}".format(epoch, auc) + '_x.npy'), pr_x)
                 np.save(os.path.join(self.test_result_dir, self.model.__name__ + "{}-{}".format(epoch, auc) + '_y.npy'), pr_y)
-                if auc > best_auc:
-                    best_auc = auc
-                    best_p = pr_x
-                    best_r = pr_y
-                    best_epoch = epoch
-
                 print('Saving model...')
                 self.logger.info('Epoch ' + str(epoch) + ' has finished')
                 self.logger.info('Saving model...')
@@ -338,6 +333,14 @@ class Config(object):
                 torch.save(self.trainModel.state_dict(), path)
                 print('Have saved model to ' + path)
                 self.logger.info('Have saved model to ' + path)
+
+                if auc > best_auc:
+                    best_auc = auc
+                    best_p = pr_x
+                    best_r = pr_y
+                    best_epoch = epoch
+
+
             # if (epoch + 1) % self.test_epoch == 0:
                 
         print("Finish training")

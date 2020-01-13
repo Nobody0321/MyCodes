@@ -25,7 +25,7 @@ class PCNN(nn.Module):
         all_filter_num = self.config.filters_num * len(self.config.filters)
 
         self.convs = nn.ModuleList([nn.Conv2d(in_channels=1, out_channels=config.filter_num, kernel_size=(k, word_feature_dim),
-                            padding=(k//2, 0)) for k in config.filters  ])
+                            padding=(k // 2, 0)) for k in config.filters吗])
         self.dropout = config.dropout
         
         self.init_model_weight()
@@ -73,4 +73,4 @@ class PCNN(nn.Module):
         return x.view(-1, x.size(1) * x.size(2))
 
     def piecewise_max_pooling(self):
-
+        

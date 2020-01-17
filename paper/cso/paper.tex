@@ -90,7 +90,7 @@ Ridel等人认为一个句袋中至少可以有一个句子实例表述了标注
 其次，当句子过长，这类标注工具的准确率会急剧下降。
 
 鉴于深度学习方法在图像领域取得了巨大的成功，自然语言领域也引入了这一强有力的工具，用来自动化地提取自然文本的语义特征。
-卷积神经网络（PCNNs)\upcite{bib3, bib10}，长短时记忆网络（LongShort Term Memory Network）\upcite{bib4, bib9} 等都在关系抽取领域的句子特征提取上取得了成功。
+卷积神经网络（CNNs)\upcite{bib3}，分段卷积神经网络(PCNNs)\upcite{bib4}, 长短时记忆网络（LongShort Term Memory Network）\upcite{bib5} 等都在关系抽取领域的句子特征提取上取得了成功。
 然而，CNN与LSTM在提取长序列的语义特征上，依然有其天然的不足。CNN由于卷积核尺寸的限制，无法很好的捕获一个长距离的依赖关系。
 而LSTM虽然克服了RNN在长距离依赖上的梯度消失问题，却依然不能够很好的理解距离过于远的依赖关系。
 
@@ -111,12 +111,13 @@ Ridel等人认为一个句袋中至少可以有一个句子实例表述了标注
 为了解决远程监督带来的噪声问题，多实例学习首先被Ridel等人在文献\cite{bib2}提出，该方法采用了一个更为宽松的假设，假设含有同一对实体且标注为关系\textit{r}的所有句子中，至少有一对确实表述了关系\textit{r}。
 以上的学习方法多依赖于手工特征或者使用外部标注工具标注的特征作为句子特征，严重依赖于标注的准确性，也会导致误差传播问题。
 
-为了解决在关系抽取时句子特征的提取问题，深度学习随着在其他领域的大获成功，也逐渐被引入了关系抽取领域。文献\cite{bib3}首次提出了使用PCNNs作为特征提取器。
+为了解决在关系抽取时句子特征的提取问题，深度学习随着在其他领域的大获成功，也逐渐被引入了关系抽取领域。文献\cite{bib4}首次提出了使用PCNNs作为特征提取器。
 PCNNs网络将句子从实体对断开成三段，在三段上分别使用最大池化，一定程度上提取了句子的结构信息。
-文献\cite{bib4}提出BiLSTM-Attention模型使用BiLSTM模型和句子间的注意力机制，更好捕获了句子中的长期依赖关系。
+文献\cite{bib5}提出BiLSTM-Attention模型使用BiLSTM模型和句子间的注意力机制，更好捕获了句子中的长期依赖关系。
 
-2016年来，注意力机制进入了人们的视线，首先是文献\cite{bib5}述信息得到的更精确的关系向量表示作为指导，得到了在关系抽取效果上的进一步提升。
-文献\cite{bib6}等人提出了自注意力机制，该机制能够更好地捕获长距离序列中各单词之间的依赖关系，同时通过并行化的方法，大大减小了运算时间，提升了效率。
+2016年来，注意力机制进入了人们的视线，首先是文献\cite{bib6}使用句袋间的选择注意力机制，对句袋内部的句子取得加权和，很好地降低了噪声句子的影响。
+文献\cite{bib7}使用从实体表示得到的更精确的关系向量表示作为注意力机制的指导，代替了原先训练得到的关系向量表示，得到了在关系抽取效果上的进一步提升。
+文献\cite{bib8}等人提出了自注意力机制，该机制能够更好地捕获长距离序列中各单词之间的依赖关系，同时通过并行化的方法，大大减小了运算时间，提升了效率。
 以自注意力机制为核心的Transformer网络和BERT语言模型也在机器翻译，对话以及各种下游任务上取得了最好的效果。
 受到自注意力机制的启发，本文提出了使用注意力模型为核心的句子编码器。在句子特征选择上，我们使用自注意力机制结合句间软注意力机制，更好的捕获了句子特征，对于下游的关系抽取效果也有了一定的提升。
 \section{算法模型}
@@ -132,7 +133,7 @@ PCNNs网络将句子从实体对断开成三段，在三段上分别使用最大
 \subsection{句子表示学习}
 \subsubsection{词编码}
 词编码主要任务是高维稀疏的独热词编码转化为稠密低维的向量表示，方便计算机处理和运算。一个好的词向量，不仅能把单词降维，还可以提供额外的单词语义信息。
-目前公认使用预训练好的词向量能够对下游任务有较好的提升，当前最主流的词编码是文献\cite{bib7}提出的Word2Vec词向量。Word2Vec使用cbow和skipgram方法，分别在维基百科上进行训练。
+目前公认使用预训练好的词向量能够对下游任务有较好的提升，当前最主流的词编码是文献\cite{bib9}提出的Word2Vec词向量。Word2Vec使用cbow和skipgram方法，分别在维基百科上进行训练。
 \subsubsection{位置编码}
 在本文的算法网络结构中，由于attention模型对于序列中单词的顺序不敏感，需要在单词编码中加入位置信息。此外，由于关系抽取情景下，一个句子中最主要的信息是两个实体，所以我们此外还要加入每个单词到句子中两个实体的相对位置信息(实验证明有没有用??)。
 对于一个输入的句子$S_i={w_1, w_2, ..., w_l}$，其中$w_i$表示句中的一个单词，l表示句子的长度，我们将每一个单词$w_i$最终映射为维度为$ d=d_{word} + 2*d_{relative\_position} + d_{absolute\_position}$
@@ -163,7 +164,7 @@ PCNNs网络将句子从实体对断开成三段，在三段上分别使用最大
 比如句子“姚明（Yao Ming），男，汉族，无党派人士，1980年9月12日出生于上海市徐汇区，祖籍江苏省苏州市吴江区震泽镇。”，
 对于关系\textit{place\_of\_birth}贡献最大的无疑是短语“出生于”，但是其中的“1980年9月12日”，“祖籍江苏省苏州市吴江区震泽镇”，两部分，也是在介绍人物出生地的时候常常会一起出现的语法结构。
 由此可见在确定一个句子的关系时，句中的很多成分都能起到一定的促进作用。
-文献\cite{bib4}在BiLstm处理后的句子特征序列上使用了软注意力机制求得各单词向量的加权和。
+文献\cite{bib5}在BiLstm处理后的句子特征序列上使用了软注意力机制求得各单词向量的加权和。
 受到上述文献的启发，本文同样在自注意力编码得到的句子序列特征上同样使用软注意力机制，将句子序列的各部分进行加权求和。获取一个更加能够包含句子各部分信息的句子向量。
 实验结果证明，本文的改进对句子特征提取起到了促进作用。
 
@@ -215,14 +216,14 @@ NYT10数据集中一共有52种关系外加一个NA关系。
 本文还使用在不同召回率下的准确率作为评价指标。
 
 \subsection{训练设置}
-为了方便比较，与前人工作\upcite{bib3, bib4}相同，本本文设置词嵌入向量维度为50，每一个位置嵌入向量维度为5。
+为了方便比较，与前人工作\upcite{bib4, bib5}相同，本本文设置词嵌入向量维度为50，每一个位置嵌入向量维度为5。
 选择230为句子向量的维度，同样也将句袋特征的维度设置为230。
 在自注意力的句子编码器内部，本文将多头注意力的头个数$n\_heads$设置为5，以便将65维的单词向量在多头注意力中平均地映射。
 此外我们将注意力模块的个数$n\_blocks$设置为1。
 
 本文使用了Adma优化器来通过反向传播更新模型参数，初始学习率设置为0.001。此外，在输出层使用Dropout用以防止模型过拟合。
 \subsection{结果比较}
-将本文的模型与文献\cite{bib11}提出的MSnet模型进行对比。
+将本文的模型与文献\cite{bib10}提出的MSnet模型进行对比。
 对每个模型训练20轮，挑选效果最好结果的进行对比，本文主要选取P@0.1， P@0.2， P@0.3， Max F1 这四个指标，
 主要衡量了分类器在不同召回要求的情况下分别对应的分类准确性，以及分类器整体的准确率召回率的均衡性。
 
@@ -248,7 +249,7 @@ NYT10数据集中一共有52种关系外加一个NA关系。
 \end{table}
 
 
-从图\ref{fig:pr} 和表\ref{tab:tab1}中可以看出，相比于文献\cite{bib11}的MSnet模型，本文的模型虽然在召回率为0.1时候对应的准确率上略逊一筹，
+从图\ref{fig:pr} 和表\ref{tab:tab1}中可以看出，相比于文献\cite{bib10}的MSnet模型，本文的模型虽然在召回率为0.1时候对应的准确率上略逊一筹，
 但是在召回率大于0.1的时候，模型的准确率始终优于MSnet模型。此外，本文的模型在整体的AUC指标，MaxF1指标上都要超出一些，
 这是因为加入句子级别软注意力机制后，对句子的特征提取不再局限于某些单词，而能够考虑到更多潜在的语义特征。
 尤其从PR的曲线走势上，可以认为，本文提出的基于层次注意力的关系抽取模型是更加有泛化能力的、更优秀的模型。
@@ -289,18 +290,17 @@ NYT10数据集中一共有52种关系外加一个NA关系。
 
 感谢我所在的灾备技术国家工程实验室，为我提供实验所需的各种软硬设施。
 
-\begin{thebibliography}{11}
+\begin{thebibliography}{10}
     \bibitem{bib1} Mike Mintz, Stevens Bills, Rion Snow, et al. Distant supervision for relation extraction without labeled data, Proceedings of the 47th Annual Meeting of the ACL and the 4th IJCNLP of the AFNLP, 2009.
     \bibitem{bib2} Riedel Sebastian, Yao Limin, McCallum Andrew , Modeling relations and their mentions without labeled text, Proc. Joint Eur. Conf. Mach. Learn. Knowl. Discovery Databases, Berlin, Germany: Springer, 2010.
-    \bibitem{bib3} Zeng Daojian, Liu Kang, Chen Yubo, et al., Distant Supervision for Relation Extraction via Piecewise Convolutional Neural Networks, Proceedings of the 2015 Conference on Empirical Methods in Natural Language Processing, 2015.
-    \bibitem{bib4} Zhou Peng, Shi Wei, Tian Jun, et al.,  Attention-Based Bidirectional Long Short-Term Memory Networks for Relation Classsification, Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics, 2016.
-    \bibitem{bib5} Lin Yankai, Shen Shiqi, Liu Zhiyuan, et al., Neural Relation Extraction with Selective Attention over Instances, Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics, 2016.
-    \bibitem{bib6} Vaswani，Ashish，Shazeer Noam，Parmar Niki，et al., Attention Is AL You Need，31st Conference on Neural Information Processing Systems (NIPS 2017), Long Beach, CA, USA, 2017.
-    \bibitem{bib7} Thome Mikolov, Sutskever Ilya , Chen K, et al., Distributed representations of words and phrases and their compositionality, Neural information processing systems, 2013.
-    \bibitem{bib8} Ji Guoliang, Liu Kang, He Shizhu, et al., Distant Supervision for Relation Extraction with Sentence-Level Attention and Entity Descriptions, Proceedings of the Thirty-First AAAI Conference on Artificial Intelligence, 2017.
-    \bibitem{bib9} Cai Rui, Zhang Xiaodong, Wang Houfeng, Bidirectional Recurrent Convolutional NeuralNetwork for Relation Classsification, Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics, 2016.
-    \bibitem{bib10} Zeng Daojian, Liu Kang, Lai Siwei，et al., Relation Classification via Convolutional Deep Neural Network, Proceedings of COLING 2014, the 25th International Conference on Computational Linguistics, 2014.
-    \bibitem{bib11} Sun Tingting, Zhang Chunhong, Ji Yang, et al., "MSnet: Multi-Head Self-Attention Network for Distantly Supervised Relation Extraction", Access IEEE, vol. 7, pp. 54472 - 54482, 2019.
+    \bibitem{bib3} Zeng Daojian, Liu Kang, Lai Siwei，et al., Relation Classification via Convolutional Deep Neural Network, Proceedings of COLING 2014, the 25th International Conference on Computational Linguistics, 2014.
+    \bibitem{bib4} Zeng Daojian, Liu Kang, Chen Yubo, et al., Distant Supervision for Relation Extraction via Piecewise Convolutional Neural Networks, Proceedings of the 2015 Conference on Empirical Methods in Natural Language Processing, 2015.
+    \bibitem{bib5} Zhou Peng, Shi Wei, Tian Jun, et al.,  Attention-Based Bidirectional Long Short-Term Memory Networks for Relation Classsification, Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics, 2016.
+    \bibitem{bib6} Lin Yankai, Shen Shiqi, Liu Zhiyuan, et al., Neural Relation Extraction with Selective Attention over Instances, Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics, 2016.
+    \bibitem{bib7} Ji Guoliang, Liu Kang, He Shizhu, et al., Distant Supervision for Relation Extraction with Sentence-Level Attention and Entity Descriptions, Proceedings of the Thirty-First AAAI Conference on Artificial Intelligence, 2017.
+    \bibitem{bib8} Vaswani，Ashish，Shazeer Noam，Parmar Niki，et al., Attention Is AL You Need，31st Conference on Neural Information Processing Systems (NIPS 2017), Long Beach, CA, USA, 2017.
+    \bibitem{bib9} Thome Mikolov, Sutskever Ilya , Chen K, et al., Distributed representations of words and phrases and their compositionality, Neural information processing systems, 2013.
+    \bibitem{bib10} Sun Tingting, Zhang Chunhong, Ji Yang, et al., "MSnet: Multi-Head Self-Attention Network for Distantly Supervised Relation Extraction", Access IEEE, vol. 7, pp. 54472 - 54482, 2019.
     
 \end{thebibliography}
 

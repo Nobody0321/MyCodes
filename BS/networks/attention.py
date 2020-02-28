@@ -19,41 +19,38 @@ def _get_sinusoid_encoding_table(n_position, d_hid):
     return torch.Tensor(sinusoid_table).unsqueeze(0)
 
 
-class PositionalEncoding(nn.Module):
-    """
-    Perform position encoding
-    """
-    def __init__(self, d_hid, n_position=200):
-        """
-        :param d_hid: d_word_vec
-        :param n_position:
-        """
-        super(PositionalEncoding, self).__init__()
-
-        # Not a parameter, no need to train
-        self.register_buffer('pos_table', _get_sinusoid_encoding_table(n_position, d_hid))
-
+class PositionalEmbedding(nn.Module):
+    def __init__(self, d_model, max_len=512):
+        super().__init__()        
+        # Compute the positional encodings once in log space.
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len).unsqueeze(1).float()
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() *
+                             -(math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+        self.weight = nn.Parameter(pe, requires_grad=False)
+         
     def forward(self, x):
-        return x + self.pos_table[:, :x.size(1)].clone().detach()
+        return x + self.weight[:, :x.size(1), :]
 
 
 class AttEncoder(nn.Module):
     """
     A encoder model with self attention mechanism.
     """
-    def __init__(self, d_word_vec, n_blocks, n_head, d_k, d_v,
-                 d_model, d_inner, dropout=0.1, n_position=200):
+    def __init__(self, config):
         super(AttEncoder, self).__init__()
-
-        self.position_enc = PositionalEncoding(d_word_vec, n_position=n_position)
-        self.dropout = nn.Dropout(p=dropout)
+        self.position_enc = PositionalEmbedding(config.att_d_input, max_len=config.max_len)
+        self.dropout = nn.Dropout(p=config.att_drop_prob)
         self.layer_stack = nn.ModuleList([
-            EncoderBlock(d_model, d_inner, n_head, d_k, d_v, dropout=dropout)
-            for _ in range(n_blocks)])
-        self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
+            EncoderBlock(config.att_d_input, config.att_d_inner, config.att_d_ff, config.att_n_head, dropout=config.att_drop_prob)
+            for _ in range(config.att_n_blocks)])
+        self.layer_norm = nn.LayerNorm(config.att_d_model, eps=1e-6)
 
     def forward(self, src_seq):
-        enc_output = self.position_enc(src_seq)
+        enc_output += self.position_enc(src_seq)
         enc_output = self.dropout(enc_output)
 
         for enc_layer in self.layer_stack:
@@ -65,107 +62,77 @@ class AttEncoder(nn.Module):
 
 
 class EncoderBlock(nn.Module):
-    """ Compose with two layers """
-
-    def __init__(self, d_model, d_inner, n_head, d_k, d_v, dropout=0.1):
-        super(EncoderBlock, self).__init__()
-        self.slf_attn = MultiHeadAttention(n_head, d_model, d_k, d_v, dropout=dropout)
-        self.pos_ffn = PositionwiseFeedForward(d_model, d_inner, dropout=dropout)
-
-    def forward(self, enc_input):
-        enc_output = self.slf_attn(
-            enc_input, enc_input, enc_input)
-        enc_output = self.pos_ffn(enc_output)
-        return enc_output
+    def __init__(self, d_model, d_inner, d_ff, n_head, dropout=0.1):
+        super().__init__()
+        self.attn_head = MultiHeadAttention(d_model, d_inner, n_head, dropout)
+        self.layer_norm1 = nn.LayerNorm(d_model)
+        self.dropout = nn.Dropout(dropout)
+        self.position_wise_feed_forward = nn.Sequential(
+            nn.Linear(d_model, d_ff),
+            nn.ReLU(),
+            nn.Linear(d_ff, d_model),
+        )
+        self.layer_norm2 = nn.LayerNorm(d_model)
+         
+    def forward(self, x):
+        att = self.attn_head(x, x, x)
+        x = x + self.dropout(self.layer_norm1(att))
+        pos = self.position_wise_feed_forward(x)
+        x = x + self.dropout(self.layer_norm2(pos))
+        return x
 
 
 class MultiHeadAttention(nn.Module):
-    """
-    Multi-Head Attention module
-    """
-
-    def __init__(self, n_head, d_model, d_k, d_v, dropout=0.1):
+    """The full multihead attention block"""
+    def __init__(self, d_model, d_inner, n_head, dropout=0.1):
         super().__init__()
+        self.d_model = d_model
+        self.d_inner = d_inner
         self.n_head = n_head
-        self.d_k = d_k  # Dimension of key in scale product att
-        self.d_v = d_v  # Dimension of val in scale product att
-
-        self.w_qs = nn.Linear(d_model, n_head * d_k, bias=False)
-        self.w_ks = nn.Linear(d_model, n_head * d_k, bias=False)
-        self.w_vs = nn.Linear(d_model, n_head * d_v, bias=False)
-        self.fc = nn.Linear(n_head * d_v, d_model, bias=False)
-
-        self.attention = ScaledDotProductAttention(temperature=d_k ** 0.5)
-
-        self.dropout = nn.Dropout(dropout)
-        self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
-
-    def forward(self, q, k, v):
-        d_k, d_v, n_head = self.d_k, self.d_v, self.n_head
-        sz_b, len_q, len_k, len_v = q.size(0), q.size(1), k.size(1), v.size(1)
-
-        residual = q
-        q = self.layer_norm(q)
-
-        # Separate different heads: b x lq x n x dv
-        q = self.w_qs(q).view(sz_b, len_q, n_head, d_k)
-        k = self.w_ks(k).view(sz_b, len_k, n_head, d_k)
-        v = self.w_vs(v).view(sz_b, len_v, n_head, d_v)
-
-        # Transpose for attention dot product: b x n x lq x dv
-        q, k, v = q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)
-
-        q = self.attention(q, k, v)
-
-        # Transpose to move the head dimension back: b x lq x n x dv
-        # Combine the last two dimensions to concatenate all the heads together: b x lq x (n*dv)
-        q = q.transpose(1, 2).contiguous().view(sz_b, len_q, -1)
-        q = self.dropout(self.fc(q))
-        q += residual
-
-        return q
-
-
-class PositionwiseFeedForward(nn.Module):
-    """
-    A two-feed-forward-layer module
-    """
-
-    def __init__(self, d_in, d_hid, dropout=0.1):
-        super().__init__()
-        self.w_1 = nn.Linear(d_in, d_hid)  # position-wise
-        self.w_2 = nn.Linear(d_hid, d_in)  # position-wise
-        self.layer_norm = nn.LayerNorm(d_in, eps=1e-6)
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, x):
-        residual = x
-        x = self.layer_norm(x)
-
-        x = self.w_2(F.relu(self.w_1(x)))
-        x = self.dropout(x)
-        x += residual
-
+ 
+        self.attn_head = nn.ModuleList([
+            AttentionHead(d_model, d_inner, dropout) for _ in range(n_head)
+        ])
+        self.projection = nn.Linear(d_inner * n_head, d_model) 
+     
+    def forward(self, queries, keys, values):
+        x = [attn(queries, keys, values) # (Batch, Seq, Feature)
+             for i, attn in enumerate(self.attn_head)]
+         
+        x = torch.cat(x, 2) # (Batch, Seq, d_inner * n_head)
+        x = self.projection(x) # (Batch, Seq, D_Model)
         return x
 
+
+class AttentionHead(nn.Module):
+    """A single attention head"""
+    def __init__(self, d_model, d_inner, dropout=0.1):
+        super().__init__()
+        # We will assume the queries, keys, and values all have the same feature size
+        self.attn = ScaledDotProductAttention(dropout)
+        self.query_tfm = nn.Linear(d_model, d_inner)
+        self.key_tfm = nn.Linear(d_model, d_inner)
+        self.value_tfm = nn.Linear(d_model, d_inner)
+ 
+    def forward(self, queries, keys, values):
+        Q = self.query_tfm(queries) # (Batch, Seq, Feature)
+        K = self.key_tfm(keys) # (Batch, Seq, Feature)
+        V = self.value_tfm(values) # (Batch, Seq, Feature)
+        x = self.attn(Q, K, V)
+        return x
 
 class ScaledDotProductAttention(nn.Module):
     """
     Scaled Dot-Product Attention
     """
 
-    def __init__(self, temperature, attn_dropout=0.1):
+    def __init__(self, dropout=0.1):
         super().__init__()
-        self.temperature = temperature
-        self.dropout = nn.Dropout(attn_dropout)
-
-    def forward(self, q, k, v, mask=None):
-        attn = torch.matmul(q / self.temperature, k.transpose(2, 3))
-
-        if mask is not None:
-            attn = attn.masked_fill(mask == 0, -1e9)
-
-        attn = self.dropout(F.softmax(attn, dim=-1))
-        output = torch.matmul(attn, v)
-
+        self.dropout = nn.Dropout(dropout)
+ 
+    def forward(self, q, k, v):
+        d_k = k.size(-1) # get the size of the key 
+        attn = F.softmax(torch.bmm(q / d_k**0.5, k.transpose(1, 2)), dim = 2)
+        attn = self.dropout(attn)
+        output = torch.bmm(attn, v) 
         return output

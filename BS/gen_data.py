@@ -2,11 +2,11 @@ import numpy as np
 import os
 import json
 
-in_path = "../../raw_data/"
+in_path = "./raw_data/"
 out_path = "./data"
 case_sensitive = False
-if not os.path.exists('./data'):
-	os.mkdir('./data')
+if not os.path.exists(out_path):
+	os.mkdir(out_path)
 train_file_name = in_path + 'train.json'
 test_file_name = in_path + 'test.json'
 word_file_name = in_path + 'word_vec.json'
@@ -14,12 +14,28 @@ rel_file_name = in_path + 'rel2id.json'
 
 
 def find_pos(sentence, head, tail):
+	"""find each word's pos to head and tail entity
+	
+	Args:
+		sentence (str): sen str
+		head (str): head entity str
+		tail (str): tail entity str	
+	Returns:
+		[type]: [description]
+	"""
 	def find(sentence, entity):
+		"""
+		find entity index
+		"""
+		# entity starting pos
 		p = sentence.find(' ' + entity + ' ')
 		if p == -1:
+			# entity part not found
 			if sentence[:len(entity) + 1] == entity + ' ':
+				# entity at start
 				p = 0
 			elif sentence[-len(entity) - 1:] == ' ' + entity:
+				# entity at end
 				p = len(sentence) - len(entity)
 			else:
 				p = 0
@@ -32,15 +48,15 @@ def find_pos(sentence, head, tail):
 	p2 = find(sentence, tail)
 	words = sentence.split()
 	cur_pos = 0
-	pos1 = -1
-	pos2 = -1
+	head_entity_pos = -1
+	tail_entity_pos = -1
 	for i, word in enumerate(words):
 		if cur_pos == p1:
-			pos1 = i
+			head_entity_pos = i
 		if cur_pos == p2:
-			pos2 = i
+			tail_entity_pos = i
 		cur_pos += len(word) + 1
-	return pos1, pos2
+	return head_entity_pos, tail_entity_pos
 
 
 def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_sensitive=False, is_training=True):
@@ -75,46 +91,51 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_s
 	print("Building word vector matrix and mapping...")
 	word2id = {}
 	word_vec_mat = []
-	word_size = len(ori_word_vec[0]['vec'])
-	print("Got {} words of {} dims".format(len(ori_word_vec), word_size))
+	word_vec_dim = len(ori_word_vec[0]['vec'])
+	print("Got {} words of {} dims".format(len(ori_word_vec), word_vec_dim))
 	for i in ori_word_vec:
 		word2id[i['word']] = len(word2id)
 		word_vec_mat.append(i['vec'])
 	word2id['UNK'] = len(word2id)
 	word2id['BLANK'] = len(word2id)
-	word_vec_mat.append(np.random.normal(loc=0, scale=0.05, size=word_size))
-	word_vec_mat.append(np.zeros(word_size, dtype=np.float32))
+	# UNK vector
+	word_vec_mat.append(np.random.normal(loc=0, scale=0.05, size=word_vec_dim))
+	# blank vector
+	word_vec_mat.append(np.zeros(word_vec_dim, dtype=np.float32))
 	word_vec_mat = np.array(word_vec_mat, dtype=np.float32)
 	print("Finish building")
 
-	# sorting
+	# sorting, by head entity then tail entity then relation
 	print("Sorting data...")
 	ori_data.sort(key=lambda a: a['head']['id'] + '#' + a['tail']['id'] + '#' + a['relation'])
 	print("Finish sorting")
 
-	sen_tot = len(ori_data)
-	sen_word = np.zeros((sen_tot, max_length), dtype=np.int64)
-	sen_pos0 = np.zeros((sen_tot, max_length), dtype=np.int64)
-	sen_pos1 = np.zeros((sen_tot, max_length), dtype=np.int64)
-	sen_pos2 = np.zeros((sen_tot, max_length), dtype=np.int64)
-	sen_mask = np.zeros((sen_tot, max_length, 3), dtype=np.float32)
-	sen_label = np.zeros((sen_tot), dtype=np.int64)
-	sen_len = np.zeros((sen_tot), dtype=np.int64)
+	n_sen = len(ori_data)
+	sen_word = np.zeros((n_sen, max_length), dtype=np.int64)
+	sen_pos0 = np.zeros((n_sen, max_length), dtype=np.int64)
+	sen_head_entity_pos = np.zeros((n_sen, max_length), dtype=np.int64)
+	sen_tail_entity_pos = np.zeros((n_sen, max_length), dtype=np.int64)
+	sen_mask = np.zeros((n_sen, max_length, 3), dtype=np.float32)
+	sen_label = np.zeros((n_sen), dtype=np.int64)
+	sen_len = np.zeros((n_sen), dtype=np.int64)
 	bag_label = []
 	bag_scope = []
 	bag_key = []
 	for i in range(len(ori_data)):
 		if i % 1000 == 0:
 			print(i)
-		sen = ori_data[i]
+		data = ori_data[i]
 		# sen_label 
-		if sen['relation'] in rel2id:
-			sen_label[i] = rel2id[sen['relation']]
+		if data['relation'] in rel2id:
+			sen_label[i] = rel2id[data['relation']]
 		else:
 			sen_label[i] = rel2id['NA']
-		words = sen['sentence'].split()
+
+		words = data['sentence'].split()
+
 		# sen_len
 		sen_len[i] = min(len(words), max_length)
+
 		# sen_word
 		for j, word in enumerate(words):
 			if j < max_length:
@@ -122,26 +143,26 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_s
 					sen_word[i][j] = word2id[word]
 				else:
 					sen_word[i][j] = word2id['UNK']
+		# padding
 		for j in range(j + 1, max_length):
 			sen_word[i][j] = word2id['BLANK']
 
-		pos1, pos2 = find_pos(sen['sentence'], sen['head']['word'], sen['tail']['word'])
-		if pos1 == -1 or pos2 == -1:
+		head_entity_pos, tail_entity_pos = find_pos(data['sentence'], data['head']['word'], data['tail']['word'])
+		if head_entity_pos == -1 or tail_entity_pos == -1:
 			raise Exception(
-				"[ERROR] Position error, index = {}, sentence = {}, head = {}, tail = {}".format(i, sen['sentence'],
-				                                                                                 sen['head']['word'],
-				                                                                                 sen['tail']['word']))
-		if pos1 >= max_length:
-			pos1 = max_length - 1
-		if pos2 >= max_length:
-			pos2 = max_length - 1
-		pos_min = min(pos1, pos2)
-		pos_max = max(pos1, pos2)
+				"[ERROR] Position error, index = {}, sentence = {}, head = {}, tail = {}".format(i, data['sentence'],
+				                                                                                 data['head']['word'],
+				                                                                                 data['tail']['word']))
+		if head_entity_pos >= max_length:
+			head_entity_pos = max_length - 1
+		if tail_entity_pos >= max_length:
+			tail_entity_pos = max_length - 1
+		pos_min, pos_max = list(sorted([head_entity_pos, tail_entity_pos]))
 		for j in range(max_length):
-			# sen_pos1, sen_pos2
+			# sen_head_entity_pos, sen_tail_entity_pos
 			sen_pos0[i][j] = j
-			sen_pos1[i][j] = j - pos1 + max_length
-			sen_pos2[i][j] = j - pos2 + max_length
+			sen_head_entity_pos[i][j] = j - head_entity_pos + max_length
+			sen_tail_entity_pos[i][j] = j - tail_entity_pos + max_length
 			# sen_mask
 			if j >= sen_len[i]:
 				sen_mask[i][j] = [0, 0, 0]
@@ -151,11 +172,13 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_s
 				sen_mask[i][j] = [0, 100, 0]
 			else:
 				sen_mask[i][j] = [0, 0, 100]
-		# bag_scope	
+		# bag_range	
 		if is_training:
-			tup = (sen['head']['id'], sen['tail']['id'], sen['relation'])
+			# sort train data by entity pair and relation
+			tup = (data['head']['id'], data['tail']['id'], data['relation'])
 		else:
-			tup = (sen['head']['id'], sen['tail']['id'])
+			# sort test data by entity pair
+			tup = (data['head']['id'], data['tail']['id'])
 		if bag_key == [] or bag_key[len(bag_key) - 1] != tup:
 			bag_key.append(tup)
 			bag_scope.append([i, i])
@@ -168,11 +191,13 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_s
 			bag_label.append(sen_label[i[0]])
 	else:
 		for i in bag_scope:
+			# for testing data, each bag has a multi-hot label
 			multi_hot = np.zeros(len(rel2id), dtype=np.int64)
 			for j in range(i[0], i[1] + 1):
 				multi_hot[sen_label[j]] = 1
 			bag_label.append(multi_hot)
 	print("Finish processing")
+
 	# ins_scope
 	ins_scope = np.stack([list(range(len(ori_data))), list(range(len(ori_data)))], axis=1)
 	print("Processing instance label...")
@@ -198,11 +223,12 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_s
 		name_prefix = "train"
 	else:
 		name_prefix = "test"
+		
 	np.save(os.path.join(out_path, 'vec.npy'), word_vec_mat)
 	np.save(os.path.join(out_path, name_prefix + '_word.npy'), sen_word)
 	np.save(os.path.join(out_path, name_prefix + '_pos0.npy'), sen_pos0)
-	np.save(os.path.join(out_path, name_prefix + '_pos1.npy'), sen_pos1)
-	np.save(os.path.join(out_path, name_prefix + '_pos2.npy'), sen_pos2)
+	np.save(os.path.join(out_path, name_prefix + '_pos1.npy'), sen_head_entity_pos)
+	np.save(os.path.join(out_path, name_prefix + '_pos2.npy'), sen_tail_entity_pos)
 	np.save(os.path.join(out_path, name_prefix + '_mask.npy'), sen_mask)
 	np.save(os.path.join(out_path, name_prefix + '_bag_label.npy'), bag_label)
 	np.save(os.path.join(out_path, name_prefix + '_bag_scope.npy'), bag_scope)

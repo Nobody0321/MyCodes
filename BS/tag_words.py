@@ -5,8 +5,8 @@ import json
 in_path = "./raw_data/"
 out_path = "./data"
 case_sensitive = False
-if not os.path.exists("./data"):
-    os.mkdir("./data")
+if not os.path.exists(out_path):
+    os.mkdir(out_path)
 train_file_name = in_path + "train.json"
 test_file_name = in_path + "test.json"
 word_file_name = in_path + "word_vec.json"
@@ -103,7 +103,7 @@ def init(file_name, word_vec_file_name, rel2id_file_name, max_length=120, case_s
     bag_label = []
     bag_scope = []
     bag_key = []
-    for i in range(len(ori_data)):
+    for i in range(100):
         if i % 1000 == 0:
             print(i)
         sen = ori_data[i]

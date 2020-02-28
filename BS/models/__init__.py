@@ -4,9 +4,3 @@ from .CNN_AVE import CNN_AVE
 from .PCNN_AVE import PCNN_AVE
 from .CNN_ONE import CNN_ONE
 from .PCNN_ONE import PCNN_ONE
-from .MSNET_ATT import MSNET_ATT
-from .MSNET_Layer_ATT import MSNET_Layer_ATT
-from .BiGru_ATT import BiGru_ATT
-from .BiLstm_ATT import BiLstm_ATT
-from .MSNet_Layer_att2 import MSNet_Layer_att2
-from .MSNet_ff_att import Msnet_ff_att

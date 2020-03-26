@@ -448,49 +448,12 @@ class SelfAttEncoder(nn.Module):
         # x = self.pos_encoder(x)
         att = self.attn_head(x, x, x)
         x = x + self.dropout(self.layer_norm1(att))
-        pos = self.position_wise_feed_forward(x)
+        # pos = /self.position_wise_feed_forward(x)
         x = x + self.dropout(self.layer_norm2(x))
         x = self.output_fc1(x)
         x = self.output_fc2(x)
         return torch.max(x, dim=1)[0]
         # return x
-
-    """
-    A encoder model with self attention mechanism.
-    """
-    def __init__(self, config):
-        super().__init__()
-        # self.pos_encoder = PositionalEmbedding(config.att_d_model, config.max_length)
-        self.attn_head = MultiHeadAttention(config.att_d_model, config.att_d_inner, config.att_n_head, config.att_dropout)
-        self.cnn = nn.Conv2d(1, config.hidden_size * 3, (config.window_size, config.hidden_size*3), (1, 1), (1, 0))
-        self.soft_att = SoftAtt(config)
-        self.layer_norm1 = nn.LayerNorm(config.att_d_model)
-        self.dropout = nn.Dropout(config.att_dropout)
-        self.position_wise_feed_forward = nn.Sequential(
-            nn.Linear(config.att_d_model, config.att_d_ff),
-            nn.ReLU(),
-            nn.Linear(config.att_d_ff, config.att_d_model),
-        )
-        self.layer_norm2 = nn.LayerNorm(config.att_d_model)
-        self.output_fc1 = nn.Linear(config.att_d_model, config.hidden_size)
-        self.output_fc2 = nn.Linear(config.hidden_size, config.hidden_size * 3)
-         
-    def forward(self, x):
-        # x = self.pos_encoder(x)
-        att = self.attn_head(x, x, x)
-        x = x + self.dropout(self.layer_norm1(att))
-        pos = self.position_wise_feed_forward(x)
-        x = x + self.dropout(self.layer_norm2(x))
-        x = self.output_fc1(x)
-        x = self.output_fc2(x)
-        # b, 1, 120, 60
-        x = torch.unsqueeze(x, dim=1)
-        # b, 690, 120, 1
-        x = self.cnn(x)
-        # b, 120, 690
-        x = x.view(x.size(0), x.size(2), -1)
-        x = self.soft_att(x)
-        return x
 
 
 class MultiHeadAttention(nn.Module):
@@ -744,12 +707,34 @@ def train_model():
     con.set_train_model(self_att_selective_att)
     con.train()
 
+
 # train_model()
 con = Config()
 con.data_path = r"D:\Code\MyCodes\BS\mini_data"
 con.load_train_data()    
-model = self_att_selective_att(con)
-print(model.state_dict().keys())
+pretrained_model = self_att_selective_att(con)
 
-model.load_state_dict(torch.load("./self_att_selective_att-20-0.3018619105308484"))
-print(model.state_dict().keys())
+pretrained_model.load_state_dict(torch.load(r"D:\Code\MyCodes\BS\self_att_selective_att-20-0.3018619105308484", map_location="cpu"))
+update_dict = {k:v for k, v in pretrained_model.state_dict().items() if not k.startswith(("selector", "classifier", "embedding.word"))}
+# print(update_dict.keys())
+from self_att_cnn_selective_att import self_att_cnn_selective_att
+model = self_att_cnn_selective_att(con)
+model_dict = model.state_dict()
+# # for p in model.parameters():
+# #     print(p)
+# update_dict = {k: v for k,v in pretrained_model.state_dict().items() if k not in model.state_dict().keys() and not k.startsWith("")}
+# print(update_dict.values())
+freeze_id = []
+model_dict.update(update_dict)
+model.load_state_dict(model_dict)
+for i, p in enumerate(model_dict):
+    if not p in update_dict:
+        # freeze_id.append(i)
+        print(i, p)
+print(freeze_id)
+# for i,p in enumerate(model.parameters()):
+#     if i in freeze_id:
+#         p.requires_grad = False
+# # print(model.state_dict().keys())
+# torch.save(model.state_dict(), r"D:\Code\MyCodes\BS\self_att_cnn_selective_att")
+

@@ -4,9 +4,7 @@
 *test.py
 NLP/word2vec_sentenceSimilarity/dataset/
 NLP/word2vec_sentenceSimilarity/model/
-*.xls
 *.xlsx
-*.xls
 *.xls
 *.pdf
 *.json
@@ -18,7 +16,5 @@ test.*
 .vscode
 */idea
 KG/tf_test.py
-BS/mini_dataset-1000/
 BS/raw_data/
-MyBS/mini_dataset-1000/
 MyBS/raw_data/

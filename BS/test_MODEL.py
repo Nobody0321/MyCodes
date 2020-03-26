@@ -11,15 +11,9 @@ model = {
     'pcnn_att': models.PCNN_ATT,
     'pcnn_one': models.PCNN_ONE,
     'pcnn_ave': models.PCNN_AVE,
-    'pcnn_self': models.PCNN_Self,
     'cnn_att': models.CNN_ATT,
     'cnn_one': models.CNN_ONE,
     'cnn_ave': models.CNN_AVE,
-    'msnet_att': models.MSNET_ATT,
-    "msnet_layer_att": models.MSNET_Layer_ATT,
-    "msnet_layer_att2": models.MSNet_Layer_att2,
-    "bigru": models.BiGru_ATT,
-    "att_pcnn": models.SelfPCNN_ATT
 }
 con = config.Config()
 # con.set_max_epoch(15)

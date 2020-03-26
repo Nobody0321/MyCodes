@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from networks.focal_loss import FocalLoss
+from ..networks.focal_loss import FocalLoss
 
 
 class Classifier(nn.Module):

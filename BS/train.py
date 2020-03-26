@@ -18,7 +18,6 @@ model = {
     'pcnn_att': models.PCNN_ATT,
     'pcnn_one': models.PCNN_ONE,
     'pcnn_ave': models.PCNN_AVE,
-    'pcnn_self': models.PCNN_Self,
     'cnn_att': models.CNN_ATT,
     'cnn_one': models.CNN_ONE,
     'cnn_ave': models.CNN_AVE,
@@ -31,5 +30,5 @@ con.set_learning_rate(0.001)
 con.set_max_epoch(15)
 con.load_train_data()
 con.load_test_data()
-con.set_train_model(model[args.model_name])
+con.set_train_model(model[args.model_name.lower()])
 con.train()

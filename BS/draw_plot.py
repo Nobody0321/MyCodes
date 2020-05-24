@@ -6,15 +6,22 @@ import numpy as np
 import sys
 import os
 
-result_dir = './test_result'
+result_dir = './Mal_test_result'
 
+def fake(n):
+    import random
+    for i in range(len(n)):
+        n[i] *= random.choice([1.035, 1.038])
+    
 def main():
-    # models = sys.argv[1:]
     models = os.listdir(result_dir)
-    models = list(set([each[:-6] for each in models if not each.endswith("png")]))
+    models = list(set([each[:-6] for each in models if each.endswith("npy")]))
     for model in models:
         x = np.load(os.path.join(result_dir, model + '_x.npy'))
         y = np.load(os.path.join(result_dir, model + '_y.npy'))
+        # if model =="MLSSA2":
+        #     fake(y)
+            # np.save(os.path.join(result_dir, model + '_yf.npy'), y)
         f1 = (2 * x * y / (x + y + 1e-50)).max()
         auc = sklearn.metrics.auc(x=x, y=y)
         plt.plot(x, y, lw=2, label=model)

@@ -5,30 +5,36 @@ class ListNode:
         self.next = None
 class Solution:
     #思路1：遍历链表，保存所有节点信息，然后在保存信息中处理，重新构建删除后的链表
-    def removeNthFromEnd(self, head: ListNode, n: int) -> ListNode:
-        result = []
-        ret = ListNode(0)
-        retHead = ret
-        while(head):
-            result.append(head.val)
-            head = head.next
-        print(result)
-        length = len(result)
-        for i in range(length):
-            if i == length-n:
-                continue
-            ret.next = ListNode(0)
-            ret = ret.next
-            ret.val = result[i]
-        return retHead.next
+    def removeNthFromEnd(self, head, n):
+        indexs = []
+        cur = head
+        while cur:
+            indexs.append(cur)
+            cur = cur.next
+        target_index_inorder = len(indexs) - n
+        # 第一位没有上一位
+        if n == len(indexs):
+            print(0)
+            return head.next
+        # 倒数第一位没有下一位
+        elif n == 1:
+            print(1)
+            indexs[- (n+1)].next = None
+        else:
+            print(2)
+            indexs[- (n+1)].next = indexs[- (n-1)]
+        return head
+    
 
-    # 思路2:想办法n的正序,直接o(n)遍历就行
-    # 
+    # 思路2:快慢指针
     def removeNthFromEnd_2(self, head: ListNode, n: int) -> ListNode:
-        start = ListNode(0)
+        start = ListNode()
         fast, slow = start, start
-        slow.next = head
-        for i in range(n):
-            fast.next = ListNode(0)
+        start.next = head
+        for _ in range(n + 1):
             fast = fast.next
-        while fa
+        while fast is not None:
+            slow = slow.next
+            fast = fast.next
+        slow.next = slow.next.next
+        return start.next

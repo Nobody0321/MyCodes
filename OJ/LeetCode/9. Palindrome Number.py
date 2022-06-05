@@ -1,18 +1,13 @@
 class Solution:
-    def isPalindrome(self, x):
-        """
-        :type x: int
-        :rtype: bool
-        """
-        x = str(x)
-        return  x == x[::-1]
+    def isPalindrome(self, x: int) -> bool:
+        if x < 0:
+            return False
+        o_x = x
+        r_x = 0
+        while x:
+            r_x = r_x * 10 + (x % 10)
+            x = x // 10
+        return r_x == o_x
 
-            
-if __name__ == '__main__':
-    s = Solution()
-    while True: 
-        try: 
-            number = input('随便输：')
-            print(s.isPalindrome(int(number)))
-        except: 
-            break 
+if __name__ == "__main__":
+    print(Solution().isPalindrome(10))

@@ -1,22 +1,31 @@
 class Solution:
-    def convert(self, s, numRows):
-        if numRows == 1 or numRows >= len(s):
+    def convert(self, s: str, numRows: int) -> str:
+        if len(s) <= 1 or numRows == 1:
             return s
+        mod = numRows * 2 - 2
+        num_columns = len(s) // mod * (numRows - 1) + (1 if len(s) % mod < numRows else len(s) % mod - numRows + 1)
+        result = [""] * numRows
         
-        res = [''] * numRows  # res 存放所有行
-        index, step = 0, 1  # index 指向当前转到的行，step控制index的增减
+        i = 0
+        cur_row = 0
+        cur_column = 0
+        flag = 1
         for c in s:
-            res[index] += c
-            if index == 0:
-                # index从0开始，是递增方向
-                step = 1
-            elif index == numRows - 1:
-                # index 到numRows, 是递减方向
-                step = -1
-            index += step
+            print(cur_row, cur_column)
+            print(cur_row * num_columns + cur_column)
+            result[cur_row] += c
+            if cur_row == numRows - 1:
+                flag = -1
+            elif cur_row == 0:
+                flag = 1
 
-        return ''.join(res)  # 连接所有行      
+            cur_row += flag
+            if flag == -1:
+                cur_column += 1
+
+        return "".join(result)
 
 
 if __name__ == "__main__":
     print(Solution().convert( s = "PAYPALISHIRING", numRows = 4))
+    print(Solution().convert( s = "AB", numRows = 1))

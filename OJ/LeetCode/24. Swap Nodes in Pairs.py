@@ -5,7 +5,15 @@
 #         self.next = None
 
 class Solution:
-    def swapPairs(self, head: ListNode) -> ListNode:
+    def swapPairs_0(self, head: ListNode) -> ListNode:
+        """ 用两个指针，一次替换两个
+
+        Args:
+            head (ListNode): _description_
+
+        Returns:
+            ListNode: _description_
+        """
         pre, pre.next = self, head
         while pre.next and pre.next.next:
             a = pre.next

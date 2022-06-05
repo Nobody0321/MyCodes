@@ -1,14 +1,15 @@
 class Solution:
     def letterCombinations(self, digits: str) -> List[str]:
-        digit_map = {}
-        digit_map['2'] = ["a","b","c"]
-        digit_map['3'] = ["d", "e", "f"]
-        digit_map['4'] = ["g","h","i"]
-        digit_map['5'] = ["j","k","l"]
-        digit_map['6'] = ["m", "n", "o"]
-        digit_map['7'] = ["p","q","r", "s"]
-        digit_map['8'] = ["t","u","v"]
-        digit_map['9'] = ["w", "x", "y", "z"]
+        digit_map = {
+            '2': ["a","b","c"],
+            '3': ["d", "e", "f"],
+            '4': ["g","h","i"],
+            '5': ["j","k","l"],
+            '6': ["m", "n", "o"],
+            '7': ["p","q","r", "s"],
+            '8': ["t","u","v"],
+            '9': ["w", "x", "y", "z"]
+        }
         
         result = []
         for digit in digits:

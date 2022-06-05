@@ -4,14 +4,20 @@ class Solution:
         :type x: int
         :rtype: int
         """
-        flag = 1 if x >= 0 else -1
-        x = str(abs(x))
-        x = flag * int(x[::-1])
-        if  x <= 2 ** 31 - 1 and x >= - 2 ** 31:
-            return x
-        else: return 0
+        t = 1 if x > 0 else -1
+        x = x if x > 0 else -x
+        y = 0
+        while x > 0:
+            res = x % 10
+            y = y * 10 + res
+            x = x // 10
+        y = t * y
+        if  y <= 2 ** 31 - 1 and y >= -2 ** 31:
+            return y
+        else:
+            return 0
 
         
 if __name__ == '__main__':
     s = Solution()
-    print(s.reverse(-123))
+    print(s.reverse(123))
